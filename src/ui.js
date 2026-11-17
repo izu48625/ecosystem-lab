@@ -3,10 +3,11 @@
 'use strict';
 const $=id=>document.getElementById(id), {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL}=window.EcosystemCore;
 const cv=$('world'),c=cv.getContext('2d'),pop=$('chart'),popCtx=pop.getContext('2d'),pred=$('predChart'),predCtx=pred.getContext('2d');
-let lab,playing=true,ended=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0,activeTab='normal',resumeWhenNormal=false;
+const CHECKPOINT_DAY=100;
+let lab,playing=true,ended=false,checkpointPassed=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0,activeTab='normal',resumeWhenNormal=false;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value),duration:Infinity}}
-function reset(){lab=new Lab(options());playing=true;ended=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};show();draw();drawCharts()}
+function reset(){lab=new Lab(options());playing=true;ended=false;checkpointPassed=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};show();draw();drawCharts()}
 function creature(e){
  c.save();c.translate(e.x,e.y);c.rotate(e.angle);const sz=e.type==='g'?.88:e.type==='r'?1.08:1.22;c.scale(sz,sz);
  c.fillStyle='#08161399';c.beginPath();c.ellipse(1,4,12,8,0,0,Math.PI*2);c.fill();
@@ -63,7 +64,7 @@ function chartDraw(canvas,ctx,keys){
 }
 function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r'])}
 function show(){
- const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} ｜ 継続中`;
+ const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} ｜ ${!playing&&checkpointPassed&&lab.day===CHECKPOINT_DAY?'100日地点で一時停止':'観察中'}`;
  const grass=(100*lab.grassTotal()).toFixed(0)+'%';$('grass').textContent=grass;$('grassbar').style.width=grass;
  for(const t of ['g','r','b']){$('birth'+t).textContent=s.births[t];$('death'+t).textContent=s.deaths[t].starve+' / '+s.deaths[t].age+' / '+s.deaths[t].hunt+' / '+s.deaths[t].defense}
  $('killsr').textContent=s.kills.r;$('killsb').textContent=s.kills.b;$('counter').textContent=s.counters;
@@ -75,13 +76,27 @@ function show(){
  const e=lab.events[0];$('event').textContent=e?`DAY ${Math.floor(e.day)} — ${e.text}`:'';
  const sel=lab.entities.find(e=>e.id===focus);
  $('selected').textContent=sel?`#${sel.id}｜${SPECIES[sel.type].name}\nHP ${Math.ceil(sel.hp)}/${Math.ceil(sel.maxhp)}｜エネルギー ${Math.ceil(sel.energy)}%｜年齢 ${sel.age.toFixed(1)}/${sel.life.toFixed(1)}日｜攻撃力 ${sel.attack.toFixed(1)}｜移動 ${sel.speed.toFixed(2)}｜捕食 ${sel.kills}｜子 ${sel.children}｜反撃 ${sel.counters}`:'生物をタップすると、HP・年齢・エネルギー・個体記録を表示します。';
- $('toggle').textContent=ended?'✓ 実験終了':playing?'⏸ 一時停止':'▶ 再開';$('toggle').disabled=ended;
- $('stateText').textContent=playing?'シミュレーション実行中':'一時停止中';
+ $('toggle').textContent=ended?'✓ 実験終了':playing?'⏸ 一時停止':checkpointPassed&&lab.day===CHECKPOINT_DAY?'▶ 100日以降を再生':'▶ 再開';$('toggle').disabled=ended;
+ $('stateText').textContent=playing?'シミュレーション実行中':checkpointPassed&&lab.day===CHECKPOINT_DAY?'DAY100｜▶で続きを再生':'一時停止中';
 }
 let last=0;
+function pauseAtCheckpoint(){
+ checkpointPassed=true;
+ playing=false;
+ accum=0;
+}
 function frame(t){
  if(!last)last=t;const dt=Math.min(.15,(t-last)/1000);last=t;
- if(playing&&!ended){accum+=dt*.68*speed;let loops=0;while(accum>.08&&loops<95){lab.update(.08);accum-=.08;loops++}}
+ if(playing&&!ended){
+   accum+=dt*.68*speed;let loops=0;
+   while(accum>.08&&loops<95){
+     // Stop exactly once at DAY100. Resume continues past it without another pause.
+     const step=checkpointPassed?.08:Math.min(.08,CHECKPOINT_DAY-lab.day);
+     if(step<=0){pauseAtCheckpoint();break}
+     lab.update(step);accum-=.08;loops++;
+     if(!checkpointPassed&&lab.day>=CHECKPOINT_DAY-1e-9){pauseAtCheckpoint();break}
+   }
+ }
  if(activeTab==='normal'){draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}}requestAnimationFrame(frame)
 }
 function exportCSV(){
@@ -109,7 +124,13 @@ $('preset20').onclick=()=>usePreset(20);
 $('preset30').onclick=()=>usePreset(30);
 $('toggle').onclick=()=>{if(!ended)playing=!playing;show()};$('reset').onclick=reset;
 $('newseed').onclick=()=>{$('seed').value=Number($('seed').value)+1;reset()};
-function advanceTo(day){playing=false;lab.run(day,.08);show();draw();drawCharts()}
+function advanceTo(day){
+ playing=false;
+ const stopAt100=!checkpointPassed&&lab.day<CHECKPOINT_DAY&&day>=CHECKPOINT_DAY;
+ lab.run(stopAt100?CHECKPOINT_DAY:day,.08);
+ if(stopAt100)pauseAtCheckpoint();
+ show();draw();drawCharts();
+}
 $('single').onclick=()=>advanceTo(Math.floor(lab.day)+1);
 $('jump10').onclick=()=>advanceTo(lab.day+10);
 $('jump100').onclick=()=>advanceTo(lab.day+100);
