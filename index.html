@@ -1,4 +1,4 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="app-version" content="20261117-ai-escape-v2"/><title>ECOSYSTEM LAB — 生態系の100日実験</title><style>
+<!doctype html><html lang="ja"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><meta name="app-version" content="20261117-result-v1"/><title>ECOSYSTEM LAB — 生態系の100日実験</title><style>
 :root{color-scheme:dark;--bg:#0b1517;--panel:#102022;--stroke:#263d40;--ink:#edf8f4;--muted:#94aead;--g:#7de2a5;--r:#ff816f;--b:#7baaff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,'Noto Sans JP',sans-serif;font-size:13px}.app{max-width:1160px;margin:auto;padding:16px}.top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:14px}.brand{font-size:19px;font-weight:850;letter-spacing:.015em}.sub{font-size:11px;color:var(--muted);margin-top:3px}.pill{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border:1px solid var(--stroke);background:#142a2d;border-radius:99px;font-size:11px;color:var(--muted)}.dot{width:7px;height:7px;border-radius:50%;background:#6fe1a1;box-shadow:0 0 9px #5de6a1}.tool{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 11px;align-items:center}button{border:1px solid #305154;background:#1b3134;border-radius:10px;padding:10px 12px;color:#e8f6f1;font-weight:750;cursor:pointer;font-size:12px;touch-action:manipulation}button:hover{background:#254247}button.primary{background:#bcf2cf;border-color:#bcf2cf;color:#163023}button.active{background:#426f62;border-color:#74d0a1}button:disabled{opacity:.45;cursor:default}.small{padding:8px 10px;font-size:11px}.daylabel{margin-left:auto;color:#e8f8f4;font-weight:800;font-size:13px;white-space:nowrap}.speedset{display:flex;gap:4px;border:1px solid #305154;border-radius:11px;padding:3px;background:#102427}.speedset button{border:0;background:transparent;padding:7px 9px;border-radius:7px}.speedset button.active{background:#376956}.layout{display:grid;grid-template-columns:minmax(0,1fr) 253px;gap:12px}.stage{background:#102225;border:1px solid #2d4846;border-radius:16px;overflow:hidden;position:relative}.stage canvas{display:block;width:100%;height:auto;aspect-ratio:960/600;touch-action:manipulation}.watermark{position:absolute;top:11px;left:12px;border:1px solid #345c52;background:#0b2724cc;border-radius:9px;padding:6px 9px;font-size:10px;font-weight:800;letter-spacing:.11em;color:#cbe8d8;pointer-events:none}.zoom{display:flex;position:absolute;right:12px;bottom:12px;gap:5px}.zoom button{padding:9px 11px;background:#112e2eeb;box-shadow:0 2px 10px #0005}.hint{position:absolute;left:12px;bottom:12px;color:#cbede3;background:#092621ba;border:1px solid #31554d;border-radius:7px;padding:7px 9px;font-size:10px;pointer-events:none}.side{display:flex;flex-direction:column;gap:10px}.pane{background:var(--panel);border:1px solid var(--stroke);border-radius:13px;padding:13px}.sect{font-size:11px;color:#adccca;font-weight:800;letter-spacing:.05em;margin-bottom:10px}.sp{display:flex;align-items:center;gap:9px;margin:8px 0}.circle{width:10px;height:10px;border-radius:50%}.spname{width:45px;color:#b6d0c9}.spnum{margin-left:auto;font-size:21px;line-height:1.15;font-weight:850;font-variant-numeric:tabular-nums}.muted{font-size:10px;color:var(--muted)}.tiny{font-size:11px;color:#bdd4d0}.meter{height:5px;background:#243f3c;overflow:hidden;border-radius:99px;margin-top:6px}.fill{height:100%;border-radius:99px}.ev{min-height:54px;color:#cce5d9;font-size:12px;line-height:1.65}.eventday{display:inline-block;margin-right:6px;color:#7fe5b1;font-weight:850}.deaths{margin-top:10px;background:#192f31;padding:10px;border-radius:8px;line-height:1.9;color:#c9ddd8}.info{font-size:11px;line-height:1.9;white-space:pre-line;color:#bcd5d1}.info b{color:#e6fbf2}.chartcard{border:1px solid var(--stroke);border-radius:13px;background:#102022;padding:12px;margin-top:12px}.charttop{display:flex;gap:7px;align-items:center;justify-content:space-between;margin-bottom:7px;flex-wrap:wrap}.charttitle{font-size:13px;font-weight:800}.legends{display:flex;gap:10px;flex-wrap:wrap;color:#aec9c4;font-size:10px}.legends span{display:inline-flex;align-items:center;gap:5px}.legends i{height:7px;width:7px;border-radius:99px;display:inline-block}.chart{width:100%;display:block;height:154px}.bottom{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.stat{background:#152b2d;border:1px solid #2a4647;border-radius:10px;padding:9px}.stat strong{font-size:18px;display:block;margin:3px 0}.stat .muted{display:block}.settingrow{display:flex;align-items:center;gap:8px;margin:8px 0}.settingrow label{flex:1;color:#bfd4d0;font-size:11px}.settingrow input[type=number]{width:67px;color:#e9f8f4;background:#182f31;border:1px solid #3b5558;border-radius:8px;padding:7px}.settingrow input[type=range]{width:103px;accent-color:#80cfa5}.settingrow output{font-size:11px;width:35px;text-align:right}.mutebot{color:#8daba8;font-size:10px;line-height:1.65;padding-top:10px}.btnrow{display:flex;gap:7px;flex-wrap:wrap}.expbutton{font-size:11px}.end{background:#23412e;border:1px solid #4b8b62;border-radius:9px;padding:7px 9px;color:#ddffe7;font-size:11px;display:none;margin-bottom:10px}@media(max-width:760px){.app{padding:10px}.layout{grid-template-columns:1fr}.side{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.side .pane:nth-child(3){grid-column:1/-1}.bottom{grid-template-columns:1fr}.brand{font-size:17px}.stage canvas{min-height:250px}.spnum{font-size:18px}.stats{grid-template-columns:repeat(2,1fr)}.daylabel{margin-left:0}.tool{gap:5px}.tool button{padding:9px}.pill{padding:6px 8px}}@media(max-width:390px){.hint{display:none}.side{grid-template-columns:1fr}.side .pane:nth-child(3){grid-column:auto}}
 
@@ -29,6 +29,53 @@
 .aiMetrics span{display:block;color:#a9c7c0;font-size:10px;line-height:1.5}
 .aiMetrics strong{font-size:21px;color:#b5f6ce;display:block;margin-top:3px;font-variant-numeric:tabular-nums}
 @media(max-width:520px){.aiMetrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Compact one-screen mobile screenshot report; simulation canvas retains its original 960x600 size. */
+.aiIntroCompact{padding:10px 12px;margin-bottom:10px}
+.reportOpenButton{background:#2e6149;border-color:#6ebd92;color:#f3fff7}
+.reportOverlay[hidden]{display:none!important}
+.reportOverlay{position:fixed;inset:0;z-index:1000;background:#071311f5;display:flex;justify-content:center;align-items:center;padding:8px;overscroll-behavior:contain}
+.reportCard{width:min(100%,760px);max-height:calc(100dvh - 16px);overflow-y:auto;background:#0f2223;color:#e8faf2;border:1px solid #619e83;border-radius:16px;box-shadow:0 20px 85px #000b}
+.reportHeader{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:13px 17px 8px}
+.reportEyebrow{font-size:9px;letter-spacing:.14em;color:#89c4a4;font-weight:800}
+.reportHeader h2{font-size:20px;line-height:1.3;margin:3px 0}
+.reportMeta{color:#b2cebf;font-size:11px}.reportClose{font-size:25px;min-width:37px;padding:3px 8px}
+.reportBody{padding:0 14px 8px}
+.reportBanner{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:3px 8px;background:#193b33;border-radius:9px;padding:10px 12px;margin-bottom:8px}
+.reportBanner span{color:#b3daca;font-size:10px}.reportBanner strong{color:#ccfbe0;font-size:17px}
+.reportBanner span:last-child{flex-basis:100%}
+#reportChart{display:block;width:100%;height:112px;background:#122c29;border-radius:8px}
+.reportChartLegend{display:flex;gap:10px;flex-wrap:wrap;color:#a4c3b7;font-size:10px;margin:6px 0 10px}
+.reportChartLegend span:first-child{color:#7de2a5}.reportChartLegend span:nth-child(2){color:#ff9586}
+.reportMetrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.reportMetrics>div{border:1px solid #31504b;background:#172e2b;border-radius:8px;min-width:0;padding:7px 9px}
+.reportMetrics span{display:block;color:#a4c2b8;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reportMetrics strong{display:block;color:#e8fff0;font-size:18px;line-height:1.3;margin-top:3px;font-variant-numeric:tabular-nums}
+.reportExplain{background:#142e29;border:1px solid #345b50;border-radius:10px;padding:10px 12px;margin-top:9px;font-size:11px;color:#c4dbd1;line-height:1.6}
+.reportExplainTitle{font-size:13px;font-weight:850;color:#e8fff2;margin-bottom:5px;display:flex;justify-content:space-between;gap:6px;align-items:center}
+.reportExplainTitle span{font-size:10px;color:#8bdbaa}
+.reportExplain b{color:#9de4be}
+.reportFoot{font-size:9px;line-height:1.5;color:#98b6a9;padding:7px 0 1px}
+.reportActions{display:flex;gap:8px;padding:7px 14px 12px}.reportActions button{flex:1}
+@media(max-width:520px){
+ .reportOverlay{padding:4px;align-items:center}
+ .reportCard{max-height:calc(100dvh - 8px);border-radius:12px}
+ .reportHeader{padding:9px 10px 5px}
+ .reportHeader h2{font-size:17px;margin:2px 0}
+ .reportBody{padding:0 8px 2px}
+ .reportBanner{padding:6px 9px;margin-bottom:5px}
+ .reportBanner strong{font-size:15px}
+ #reportChart{height:88px}
+ .reportChartLegend{margin:4px 0 6px;font-size:9px}
+ .reportMetrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+ .reportMetrics>div{padding:5px 6px;border-radius:7px}
+ .reportMetrics span{font-size:9px}
+ .reportMetrics strong{font-size:16px;margin-top:1px}
+ .reportExplain{margin-top:6px;padding:7px 9px;font-size:10px;line-height:1.45}
+ .reportExplainTitle{font-size:11px;margin-bottom:3px}
+ .reportFoot{font-size:8px;line-height:1.4;padding:4px 0}
+ .reportActions{padding:5px 8px 8px;gap:5px}.reportActions button{font-size:11px;padding:8px 5px}
+}
 </style></head><body><div class="app">
 <div class="top"><div><div class="brand">🌿 ECOSYSTEM LAB <span style="color:#71dfad">/</span> 100日間の生態系実験</div><div class="sub">緑・草食生物 vs 赤・捕食者 ｜ ノーマル／逃走進化／群れ進化</div></div><div class="pill"><span class="dot" id="dot"></span><span id="stateText">シミュレーション実行中</span></div></div>
 <nav class="tabs" aria-label="実験の切り替え" role="tablist">
@@ -53,23 +100,13 @@
 </div>
 </section>
 <section id="view-ai1" class="tabview" role="tabpanel" aria-labelledby="tabButtonAi1" hidden>
-  <div class="pane aiIntro">
-    <div class="charttop"><span class="charttitle">🧠 AI①｜逃走能力の進化</span><span class="upcoming" style="padding:5px 10px">ニューラルネットワーク稼働</span></div>
-    <div class="tiny">緑100匹・赤20匹・青0匹。緑の逃走判断を小型ニューラルネットワーク（10入力→8ニューロン→3出力）で行い、繁殖した子へ115個の重みを遺伝・突然変異させます。赤の行動は固定。群れの形成はAI②の実験で扱います。</div>
-    <div class="aiMetrics">
-      <div><span>生存個体の平均世代</span><strong id="aiMeanGeneration">0.0</strong></div>
-      <div><span>到達した最高世代</span><strong id="aiHighestGeneration">0</strong></div>
-      <div><span>AIを受け継いだ子</span><strong id="aiOffspring">0</strong></div>
-      <div><span>突然変異した子</span><strong id="aiMutations">0</strong></div>
-      <div><span>危険を察知した時間の逃走割合</span><strong id="aiFleeRate">—</strong></div>
-      <div><span>固定テスト状況での平均警戒信号</span><strong id="aiEscapeBias">0.000</strong></div>
-    </div>
-    <div class="chartcard" style="margin-top:12px"><div class="charttop"><span class="charttitle">平均世代の推移</span><span class="muted">生存している緑のみで計算</span></div><canvas id="aiTrend" class="chart" width="1000" height="210" aria-label="AI逃走進化の平均世代グラフ"></canvas></div>
-    <div class="mutebot">世代交代による進化であり、個体が一生の中で経験を記憶する強化学習ではありません。警戒信号は固定条件に対するニューラルネットワークの出力で、学習成績や生存率そのものではありません。DAY100で一度止まり、▶で同じ世界を続行できます。操作パネル・CSV・タブごとの世界は独立しています。</div>
+  <div class="pane aiIntro aiIntroCompact">
+    <div class="charttop"><span class="charttitle">🧠 AI①｜緑の逃走判断を進化</span><span class="upcoming" style="padding:5px 10px">遺伝型ニューラルネットワーク</span></div>
+    <div class="tiny">緑が危険の察知と逃走方向を進化。<strong>赤の捕食・寿命・繁殖ルールはノーマルと完全に同じ</strong>（ただし緑の行動変化で赤の実際の個体数は変わり得ます）。結果・学習方法は「📸 結果まとめ」から1画面で確認できます。</div>
   </div>
 </section>
 <section id="view-live" class="tabview" aria-label="現在選択中のシミュレーション">
-<div class="tool"><button class="primary" id="toggle">⏸ 一時停止</button><button id="reset">↻ 最初から</button><div class="speedset" id="speeds"><button data-s="1">1×</button><button data-s="5" class="active">5×</button><button data-s="20">20×</button></div><button id="single" class="small">+1日</button><button id="jump10" class="small">+10日</button><button id="jump100" class="small">+100日</button><button id="newseed" class="small">🎲 別の展開</button><button id="csv" class="small">↓ 統計CSV</button><span class="daylabel" id="day">DAY 0.0 ｜ 継続中</span></div>
+<div class="tool"><button class="primary" id="toggle">⏸ 一時停止</button><button id="reset">↻ 最初から</button><div class="speedset" id="speeds"><button data-s="1">1×</button><button data-s="5" class="active">5×</button><button data-s="20">20×</button></div><button id="single" class="small">+1日</button><button id="jump10" class="small">+10日</button><button id="jump100" class="small">+100日</button><button id="newseed" class="small">🎲 別の展開</button><button id="csv" class="small">↓ 統計CSV</button><button id="openReport" class="small reportOpenButton">📸 結果まとめ</button><span class="daylabel" id="day">DAY 0.0 ｜ 継続中</span></div>
 <div class="layout"><div class="stage"><canvas id="world" width="960" height="600" aria-label="生態系のシミュレーション表示"></canvas><div class="watermark">LIVE ECOSYSTEM</div><div class="hint">生物をタップすると個体情報・追跡</div><div class="zoom"><button id="zout" title="縮小">−</button><button id="zreset" title="全体表示">全体</button><button id="zin" title="拡大">＋</button></div></div><div class="side">
 <div class="pane"><div class="sect">生存個体数</div><div class="sp"><span class="circle" style="background:#70e19d"></span><span class="spname">緑</span><span class="spnum" id="ng" style="color:#7de2a5">100</span></div><div class="sp"><span class="circle" style="background:#ff7b70"></span><span class="spname">赤</span><span class="spnum" id="nr" style="color:#ff9586">20</span></div><div class="sp legacy-blue"><span class="circle" style="background:#73a7ff"></span><span class="spname">青</span><span class="spnum" id="nb" style="color:#88b5ff">10</span></div><div class="meter"><div class="fill" id="grassbar" style="width:75%;background:#6bc18d"></div></div><div class="muted" style="margin-top:5px">草の残量 <span id="grass">75%</span></div></div>
 <div class="pane"><div class="sect">直近の出来事</div><div class="ev" id="event"><span class="eventday">DAY 0</span>2種類の生物を同じ生態系に投入しました。</div><div class="muted">実際のシミュレーションから記録</div></div>
@@ -85,5 +122,40 @@
   <p>AI①と同じ初期頭数・草・赤の能力を使い、このタブに独立した100日間シミュレーションを用意します。</p></div>
 </section>
 <div class="mutebot">ECOSYSTEM LAB v0.3 ベースライン＋3タブ構成：食事後の餓死判定・壁際の逃走補正・個体日あたりの捕食効率を追加。AI①ではローカルの遺伝型ニューラルネットワークを使用します。</div><div class="mutebot">※DAY100で一度だけ自動的に一時停止します。▶「100日以降を再生」を押せば101日以降も続行し、200日目などで再停止しません。+1日・+10日・+100日も最初のDAY100をまたぐときは一度止まります。グラフとCSVはその先も更新します。※AI①逃走進化は利用可能、AI②群れ進化は未実装です。</div><div class="mutebot">※自作のゲーム内モデルです。現実の生態系の予測ではありません。まず動きと演出の試作を目的としているため、結果はランダム性を含みます。シードを固定すると同じ条件の再現ができます。</div></div>
-<script src="src/sim-core.js?v=20261117-ai-escape-v2"></script>
-<script src="src/ui.js?v=20261117-ai-escape-v2"></script></body></html>
+<div id="reportOverlay" class="reportOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="reportHeading">
+  <div id="reportCard" class="reportCard">
+    <div class="reportHeader">
+      <div><div class="reportEyebrow">ECOSYSTEM LAB / EXPERIMENT REPORT</div><h2 id="reportHeading">実験結果まとめ</h2><div id="reportMeta" class="reportMeta">DAY100 ・ Seed —</div></div>
+      <button id="closeReport" class="reportClose" aria-label="結果画面を閉じる">×</button>
+    </div>
+    <div class="reportBody">
+      <div class="reportBanner"><span id="reportStatus">実験中</span><strong id="reportFinal">緑 — / 赤 —</strong><span id="reportRule">赤の行動・繁殖ルールはノーマルと共通</span></div>
+      <canvas id="reportChart" width="920" height="200" aria-label="緑・赤の生存個体数の推移"></canvas>
+      <div class="reportChartLegend"><span>● 緑：草食</span><span>● 赤：捕食者</span><span>推移：DAY0〜現在</span></div>
+      <div class="reportMetrics">
+        <div><span>緑・生存</span><strong id="rrGreen">0</strong></div>
+        <div><span>赤・生存</span><strong id="rrRed">0</strong></div>
+        <div><span>緑・出生累計</span><strong id="rrBirthG">0</strong></div>
+        <div><span>赤・出生累計</span><strong id="rrBirthR">0</strong></div>
+        <div><span>緑・捕食死</span><strong id="rrHunted">0</strong></div>
+        <div><span>緑・餓死</span><strong id="rrStarvedG">0</strong></div>
+        <div><span>赤・餓死</span><strong id="rrStarvedR">0</strong></div>
+        <div><span>赤・捕食成功率*</span><strong id="rrHuntRate">—</strong></div>
+        <div><span>最高世代</span><strong id="rrMaxGen">—</strong></div>
+        <div><span>ピーク平均世代</span><strong id="rrPeakGen">—</strong></div>
+        <div><span>変異した子</span><strong id="rrMutation">—</strong></div>
+        <div><span>危険時の逃走割合</span><strong id="rrFlee">—</strong></div>
+      </div>
+      <div class="reportExplain">
+        <div class="reportExplainTitle">🧠 何を・どう学習させている？ <span id="reportMode">AI① 逃走進化</span></div>
+        <div id="reportInputs"><b>入力：</b>赤の位置・向き・接近度、自分の位置・HP・空腹度、周囲の草</div>
+        <div id="reportOutputs"><b>判断：</b>逃げるタイミング・逃走方向・左右への回避</div>
+        <div id="reportGenetics"><b>進化：</b>10入力→8神経→3出力／115重みを親から遺伝、重み単位8%で突然変異。生存・繁殖による自然選択（個体内の経験学習なし）</div>
+      </div>
+      <div class="reportFoot">* 捕食成功率＝累計捕食数÷追跡開始件数。世代数は進化が有利だった証拠ではありません。個体絶滅後の平均世代は使わず、観察期間中の最高値を表示。</div>
+    </div>
+    <div class="reportActions"><button id="reportSavePng" class="primary">↓ 1枚の画像で保存（PNG）</button><button id="reportReturn">実験画面に戻る</button></div>
+  </div>
+</div>
+<script src="src/sim-core.js?v=20261117-result-v1"></script>
+<script src="src/report.js?v=20261117-result-v1"></script><script src="src/ui.js?v=20261117-result-v1"></script></body></html>
