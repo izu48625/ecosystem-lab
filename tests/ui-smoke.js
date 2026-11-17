@@ -3,10 +3,10 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const EcosystemCore=require('../src/sim-core.js');
 const noop=()=>{};
 const context2d=new Proxy({}, {get:(target,key)=>target[key]??noop,set:(target,key,val)=>(target[key]=val,true)});
-const values={seed:20261117,startg:100,startr:10,startb:10,variance:10,regrowth:100};
+const values={seed:20261117,startg:100,startr:20,startb:0,variance:10,regrowth:100};
 const elements=new Map();
 function element(id){
- if(!elements.has(id))elements.set(id,{id,value:values[id]??0,textContent:'',style:{},disabled:false,onclick:null,oninput:null,addEventListener:noop,click:noop,getBoundingClientRect:()=>({left:0,top:0,width:960,height:600}),getContext:()=>context2d});
+ if(!elements.has(id))elements.set(id,{id,value:values[id]??0,textContent:'',style:{},hidden:false,attributes:{},setAttribute(n,v){this.attributes[n]=v},disabled:false,onclick:null,oninput:null,addEventListener:noop,click:noop,getBoundingClientRect:()=>({left:0,top:0,width:960,height:600}),getContext:()=>context2d});
  return elements.get(id);
 }
 const speedButtons=[1,5,20].map(v=>({dataset:{s:String(v)},classList:{toggle:noop},onclick:null}));
@@ -15,7 +15,19 @@ let requested=0;
 const appContext={document:dom,window:{EcosystemCore},requestAnimationFrame:()=>{requested++},setTimeout:noop,URL:{createObjectURL:()=>'',revokeObjectURL:noop},Blob:class{},console,Math,Number};
 vm.createContext(appContext);
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/ui.js'),'utf8'),appContext);
-assert.equal(element('ng').textContent,100);assert.equal(element('nr').textContent,10);assert.equal(element('nb').textContent,10);assert.ok(requested>0);
+assert.equal(element('ng').textContent,100);assert.equal(element('nr').textContent,20);assert.equal(element('nb').textContent,0);assert.ok(requested>0);
+element('tabButtonAi1').onclick();
+assert.equal(element('view-normal').hidden,true);
+assert.equal(element('view-ai1').hidden,false);
+assert.equal(element('view-ai2').hidden,true);
+assert.equal(element('tabButtonAi1').attributes['aria-selected'],'true');
+element('tabButtonAi2').onclick();
+assert.equal(element('view-ai1').hidden,true);assert.equal(element('view-ai2').hidden,false);
+element('tabButtonNormal').onclick();
+assert.equal(element('view-normal').hidden,false);
+element('preset10').onclick();assert.equal(element('nr').textContent,10);
+element('preset30').onclick();assert.equal(element('nr').textContent,30);
+element('preset20').onclick();assert.equal(element('nr').textContent,20);
 element('single').onclick();assert.ok(element('day').textContent.includes('1.0'));
 element('reset').onclick();assert.ok(element('day').textContent.includes('0.0'));
 element('newseed').onclick();assert.equal(Number(element('seed').value),20261118);
