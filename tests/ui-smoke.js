@@ -1,6 +1,15 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const EcosystemCore=require('../src/sim-core.js');
+const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+const realIds=new Set([...html.matchAll(/\\bid="([^"]+)"/g)].map(m=>m[1]));
+for(const file of ['../src/ui.js','../src/report.js']){
+  const source=fs.readFileSync(require('node:path').join(__dirname,file),'utf8');
+  for(const m of source.matchAll(/\\$\\('([^']+)'\\)/g)){
+    assert.ok(realIds.has(m[1]),file+' references missing #'+m[1]);
+  }
+}
+
 const noop=()=>{};
 const context2d=new Proxy({}, {get:(target,key)=>target[key]??noop,set:(target,key,val)=>(target[key]=val,true)});
 const values={seed:20261117,startg:100,startr:20,startb:0,variance:10,regrowth:100};
@@ -12,7 +21,7 @@ function element(id){
 const speedButtons=[1,5,20].map(v=>({dataset:{s:String(v)},classList:{toggle:noop},onclick:null}));
 let pngDownloads=0;
 const dom={
- getElementById:element,querySelectorAll:()=>speedButtons,
+ getElementById:id=>realIds.has(id)?element(id):null,querySelectorAll:()=>speedButtons,
  body:{appendChild:noop},
  createElement:tag=>tag==='canvas'?
    {width:0,height:0,getContext:()=>context2d,toBlob:cb=>cb({type:'image/png'})}:
@@ -32,7 +41,6 @@ assert.equal(element('view-ai2').hidden,true);
 assert.ok(element('toggle').textContent.includes('▶'),'AI① should start paused');
 assert.equal(element('ng').textContent,100);
 assert.equal(element('nr').textContent,20);
-assert.equal(Number(element('aiHighestGeneration').textContent),0);
 element('openReport').onclick();
 assert.equal(element('reportOverlay').hidden,false,'AI results open in a single-screen overlay');
 assert.ok(element('reportHeading').textContent.includes('逃走進化'));
@@ -43,9 +51,10 @@ element('closeReport').onclick();
 assert.equal(element('reportOverlay').hidden,true,'Result overlay closes without losing experiment state');
 element('jump100').onclick();
 assert.ok(element('day').textContent.includes('DAY 100.0'),'AI① reaches its own DAY100');
-assert.ok(Number(element('aiOffspring').textContent)>0,'AI① generations should reproduce');
-assert.ok(Number(element('aiMutations').textContent)>0,'AI① mutations should occur');
-assert.ok(Number(element('aiHighestGeneration').textContent)>0,'AI① generation number should increase');
+element('openReport').onclick();
+assert.ok(Number(element('rrMutation').textContent.replaceAll(',',''))>0,'AI① mutations must appear in screenshot report');
+assert.ok(Number(element('rrMaxGen').textContent)>0,'AI① generational progress must appear in report');
+element('closeReport').onclick();
 element('openReport').onclick();
 assert.equal(element('reportOverlay').hidden,false);
 assert.equal(element('rrGreen').textContent,String(element('ng').textContent),'Report matches live population');
