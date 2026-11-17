@@ -41,8 +41,8 @@ assert.ok(Number(element('aiMutations').textContent)>0,'AI① mutations should o
 assert.ok(Number(element('aiHighestGeneration').textContent)>0,'AI① generation number should increase');
 element('openReport').onclick();
 assert.equal(element('reportOverlay').hidden,false);
-assert.equal(element('rrGreen').textContent,element('ng').textContent,'Report matches live population');
-assert.equal(element('rrRed').textContent,element('nr').textContent);
+assert.equal(element('rrGreen').textContent,String(element('ng').textContent),'Report matches live population');
+assert.equal(element('rrRed').textContent,String(element('nr').textContent));
 assert.ok(Number(element('rrMutation').textContent.replaceAll(',',''))>0,'Mutated offspring shown');
 assert.ok(Number(element('rrMaxGen').textContent)>0,'Reached generation shown even after extinction');
 assert.ok(Number(element('rrPeakGen').textContent)>=0,'Historical peak generation shown');
