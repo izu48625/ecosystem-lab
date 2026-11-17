@@ -19,3 +19,5 @@ jobs:
         run: node tests/montecarlo.js 5
       - name: Quick green/red balance regression
         run: node tests/predator-balance.js 3
+      - name: Sample paired Normal vs AI escape evolution
+        run: node tests/escape-comparison.js 4
