@@ -63,29 +63,7 @@ function chartDraw(canvas,ctx,keys){
    visible.forEach((n,i)=>{if(!i)ctx.moveTo(px(n.day),py(n[k]));else ctx.lineTo(px(n.day),py(n[k]))});ctx.stroke()}
  ctx.strokeStyle='#d4efda88';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(px(lab.day),top);ctx.lineTo(px(lab.day),h-bottom);ctx.stroke();ctx.setLineDash([]);
 }
-function drawAiTrend(){
- if(activeTab!=='ai1')return;
- const canvas=$('aiTrend'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
- const left=45,right=12,top=12,bottom=27;
- const end=Math.max(100,Math.ceil(Math.max(100,lab.day)/100)*100);
- const start=Math.max(0,end-400),range=end-start;
- const data=lab.history.filter(x=>x.day>=start&&x.day<=end);
- const ymax=Math.max(1,Math.ceil(data.reduce((v,x)=>Math.max(v,x.aiMeanGeneration||0),0)+1));
- const px=x=>left+(x-start)/range*(w-left-right);
- const py=y=>top+(1-y/ymax)*(h-top-bottom);
- ctx.fillStyle='#102022';ctx.fillRect(0,0,w,h);
- ctx.font='12px system-ui';ctx.lineWidth=1;
- for(let i=0;i<=4;i++){
-   const value=ymax*i/4,y=py(value);
-   ctx.strokeStyle='#35504a';ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();
-   ctx.fillStyle='#a7c4b9';ctx.textAlign='right';ctx.fillText(value.toFixed(1),left-8,y+4);
- }
- ctx.textAlign='center';ctx.fillStyle='#94b1aa';
- for(let i=0;i<=5;i++){const day=start+range*i/5;ctx.fillText(Math.round(day)+'日',px(day),h-5)}
- ctx.strokeStyle='#b5f6ce';ctx.lineWidth=3;ctx.beginPath();
- data.forEach((p,i)=>{if(i===0)ctx.moveTo(px(p.day),py(p.aiMeanGeneration||0));else ctx.lineTo(px(p.day),py(p.aiMeanGeneration||0))});ctx.stroke();
-}
-function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r']);drawAiTrend()}
+function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r'])}
 function show(){
  const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} ｜ ${!playing&&checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'100日地点で一時停止':'観察中'}`;
  const grass=(100*lab.grassTotal()).toFixed(0)+'%';$('grass').textContent=grass;$('grassbar').style.width=grass;
@@ -101,17 +79,6 @@ function show(){
  $('selected').textContent=sel?`#${sel.id}｜${SPECIES[sel.type].name}\nHP ${Math.ceil(sel.hp)}/${Math.ceil(sel.maxhp)}｜エネルギー ${Math.ceil(sel.energy)}%｜年齢 ${sel.age.toFixed(1)}/${sel.life.toFixed(1)}日｜攻撃力 ${sel.attack.toFixed(1)}｜移動 ${sel.speed.toFixed(2)}｜捕食 ${sel.kills}｜子 ${sel.children}｜反撃 ${sel.counters}`:'生物をタップすると、HP・年齢・エネルギー・個体記録を表示します。';
  $('toggle').textContent=ended?'✓ 実験終了':playing?'⏸ 一時停止':checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'▶ 100日以降を再生':'▶ 再開';$('toggle').disabled=ended;
  $('stateText').textContent=playing?'シミュレーション実行中':checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'DAY100｜▶で続きを再生':'一時停止中';
- if(activeTab==='ai1'){
-   const ai=s.ai,green=lab.entities.filter(e=>e.type==='g'&&e.alive);
-   const meanGen=green.length?green.reduce((sum,e)=>sum+(e.generation||0),0)/green.length:0;
-   const meanBias=lab.history.at(-1)?.aiEscapeBias??0;
-   $('aiMeanGeneration').textContent=meanGen.toFixed(2);
-   $('aiHighestGeneration').textContent=ai.highestGeneration;
-   $('aiOffspring').textContent=ai.offspring;
-   $('aiMutations').textContent=ai.mutatedOffspring;
-   $('aiFleeRate').textContent=ai.threatDays>0?(100*ai.fleeDays/ai.threatDays).toFixed(1)+'%':'—';
-   $('aiEscapeBias').textContent=meanBias.toFixed(3);
- }
 
 }
 let last=0;
