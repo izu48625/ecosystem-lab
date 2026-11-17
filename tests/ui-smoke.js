@@ -2,10 +2,10 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const EcosystemCore=require('../src/sim-core.js');
 const html=fs.readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
-const realIds=new Set([...html.matchAll(/\\bid="([^"]+)"/g)].map(m=>m[1]));
+const realIds=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
 for(const file of ['../src/ui.js','../src/report.js']){
   const source=fs.readFileSync(require('node:path').join(__dirname,file),'utf8');
-  for(const m of source.matchAll(/\\$\\('([^']+)'\\)/g)){
+  for(const m of source.matchAll(/\$\('([^']+)'\)/g)){
     assert.ok(realIds.has(m[1]),file+' references missing #'+m[1]);
   }
 }
