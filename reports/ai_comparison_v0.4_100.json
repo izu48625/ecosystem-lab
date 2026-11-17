@@ -1,0 +1,45 @@
+{
+  "version": "v0.4 experimental tabular Q-learning",
+  "runs": 100,
+  "seedStart": 20261117,
+  "seedEnd": 20261216,
+  "initialCounts": {
+    "green": 100,
+    "red": 10,
+    "blue": 10
+  },
+  "learningStartsOnDay": 30,
+  "identicalWorldAtDay30": 100,
+  "outcomes": {
+    "baseline": {
+      "bothPredatorsAlive": 39,
+      "redOnly": 13,
+      "blueOnly": 6,
+      "neitherPredatorAlive": 42
+    },
+    "learning": {
+      "bothPredatorsAlive": 30,
+      "redOnly": 19,
+      "blueOnly": 6,
+      "neitherPredatorAlive": 45
+    }
+  },
+  "meanFinalCounts": {
+    "baseline": {
+      "green": 118.58,
+      "red": 4.56,
+      "blue": 2.41
+    },
+    "learning": {
+      "green": 124.66,
+      "red": 4.09,
+      "blue": 1.77
+    }
+  },
+  "meanQUpdatesPerRun": {
+    "green": 10966,
+    "red": 1275,
+    "blue": 841
+  },
+  "note": "AI learning is real tabular Q-learning, but it did not improve predator survival in this experiment. Same seed means same state until DAY30, not identical random events after policies diverge."
+}
