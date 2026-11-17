@@ -1,0 +1,19 @@
+name: Ecosystem validation
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify conservation, feeding and walls
+        run: node tests/smoke.test.js
+      - name: Verify UI callbacks
+        run: node tests/ui-smoke.js
+      - name: Simulate 100 reproducible worlds
+        run: node tests/montecarlo.js 100
