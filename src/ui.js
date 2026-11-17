@@ -74,7 +74,7 @@ let last=0;
 function frame(t){
  if(!last)last=t;const dt=Math.min(.15,(t-last)/1000);last=t;
  if(playing&&!ended){accum+=dt*.68*speed;let loops=0;while(accum>.08&&loops<95&&lab.day<100){lab.update(.08);accum-=.08;loops++}if(lab.day>=100){ended=true;playing=false}}
- draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}requestAnimationFrame(frame)
+ if(activeTab==='normal'){draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}}requestAnimationFrame(frame)
 }
 function exportCSV(){
  const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg'];
@@ -89,7 +89,7 @@ function switchTab(next){
  for(const [key,view,button] of [['normal','view-normal','tabButtonNormal'],['ai1','view-ai1','tabButtonAi1'],['ai2','view-ai2','tabButtonAi2']]){
    $(view).hidden=key!==next;$(button).setAttribute('aria-selected',String(key===next));
  }
- if(next==='normal'){playing=resumeWhenNormal&&!ended;show();draw();drawCharts()}
+ if(next==='normal'){playing=resumeWhenNormal&&!ended;$('dot').style.background='#6fe1a1';show();draw();drawCharts()}
  else{$('stateText').textContent='AIタブは設計中';$('dot').style.background='#8baaa4'}
 }
 $('tabButtonNormal').onclick=()=>switchTab('normal');
