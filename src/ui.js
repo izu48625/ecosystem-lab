@@ -64,7 +64,7 @@ function chartDraw(canvas,ctx,keys){
 }
 function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r'])}
 function show(){
- const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} ｜ ${!playing&&checkpointPassed&&lab.day===CHECKPOINT_DAY?'100日地点で一時停止':'観察中'}`;
+ const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} ｜ ${!playing&&checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'100日地点で一時停止':'観察中'}`;
  const grass=(100*lab.grassTotal()).toFixed(0)+'%';$('grass').textContent=grass;$('grassbar').style.width=grass;
  for(const t of ['g','r','b']){$('birth'+t).textContent=s.births[t];$('death'+t).textContent=s.deaths[t].starve+' / '+s.deaths[t].age+' / '+s.deaths[t].hunt+' / '+s.deaths[t].defense}
  $('killsr').textContent=s.kills.r;$('killsb').textContent=s.kills.b;$('counter').textContent=s.counters;
@@ -76,8 +76,8 @@ function show(){
  const e=lab.events[0];$('event').textContent=e?`DAY ${Math.floor(e.day)} — ${e.text}`:'';
  const sel=lab.entities.find(e=>e.id===focus);
  $('selected').textContent=sel?`#${sel.id}｜${SPECIES[sel.type].name}\nHP ${Math.ceil(sel.hp)}/${Math.ceil(sel.maxhp)}｜エネルギー ${Math.ceil(sel.energy)}%｜年齢 ${sel.age.toFixed(1)}/${sel.life.toFixed(1)}日｜攻撃力 ${sel.attack.toFixed(1)}｜移動 ${sel.speed.toFixed(2)}｜捕食 ${sel.kills}｜子 ${sel.children}｜反撃 ${sel.counters}`:'生物をタップすると、HP・年齢・エネルギー・個体記録を表示します。';
- $('toggle').textContent=ended?'✓ 実験終了':playing?'⏸ 一時停止':checkpointPassed&&lab.day===CHECKPOINT_DAY?'▶ 100日以降を再生':'▶ 再開';$('toggle').disabled=ended;
- $('stateText').textContent=playing?'シミュレーション実行中':checkpointPassed&&lab.day===CHECKPOINT_DAY?'DAY100｜▶で続きを再生':'一時停止中';
+ $('toggle').textContent=ended?'✓ 実験終了':playing?'⏸ 一時停止':checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'▶ 100日以降を再生':'▶ 再開';$('toggle').disabled=ended;
+ $('stateText').textContent=playing?'シミュレーション実行中':checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'DAY100｜▶で続きを再生':'一時停止中';
 }
 let last=0;
 function pauseAtCheckpoint(){
