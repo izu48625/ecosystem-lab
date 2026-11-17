@@ -18,7 +18,7 @@ function dataFor(lab){
     starveRed:st.deaths.r.starve,redHunts:st.hunts.r,
     redKills:st.kills.r,redRate:percent(st.kills.r,st.hunts.r),
     generation:greenAlive.length?greenAlive.reduce((sum,e)=>sum+e.generation,0)/greenAlive.length:null,
-    peakGeneration,isAI,
+    peakGeneration,
     maxGeneration:isAI?ai.highestGeneration:null,
     mutations:isAI?ai.mutatedOffspring:null,
     offspring:isAI?ai.offspring:null,
