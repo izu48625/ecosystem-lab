@@ -24,7 +24,8 @@
         blue:clamp(Number(settings.blue??10),0,60),
         variance:clamp(Number(settings.variance??10),0,25)/100,
         regrowth:clamp(Number(settings.regrowth??100),20,250)/100,
-        duration:clamp(Number(settings.duration??100),1,500)
+        // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
+        duration:settings.duration===Infinity?Infinity:clamp(Number(settings.duration??100),1,5000000)
       };
       this.seed=this.settings.seed||1;this.day=0;this.nextId=0;this.entities=[];
       this.grass=Array.from({length:GRID_X*GRID_Y},()=>this.rand(.5,1));
@@ -190,7 +191,7 @@
       this.effects=this.effects.filter(p=>p.life>0);
       const today=Math.floor(this.day);
       if(today>oldDay){for(let d=oldDay+1;d<=today;d++){this.snapshot(d);if(d%20===0){const n=this.counts();this.record('milestone',`緑${n.g}匹、赤${n.r}匹、青${n.b}匹が生存`)}}}
-      if(this.day>=this.settings.duration)this.record('end',`${this.settings.duration}日間の実験終了`);
+      if(Number.isFinite(this.settings.duration)&&this.day>=this.settings.duration)this.record('end',`${this.settings.duration}日間の実験終了`);
     }
     run(days=this.settings.duration,step=.08){let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
     summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history}}
