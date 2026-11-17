@@ -78,4 +78,41 @@ function testWalls(){
  assert.ok(a.x>9);assert.notEqual(a.y,200);
  console.log('✓ 壁際での逃走を確認');
 }
+function testNeuroevolution(){
+ const settings={seed:20261117,green:100,red:20,blue:0,duration:Infinity,mode:'escape'};
+ const normal=new Lab({...settings,mode:'normal'});
+ const ai=new Lab(settings);
+ assert.equal(ai.settings.mode,'escape');
+ assert.equal(ai.stats.ai.founders,100);
+ assert.equal(ai.entities.filter(e=>e.type==='g').length,100);
+ assert.ok(ai.entities.filter(e=>e.type==='r').every(e=>!e.genome),'Red predators remain rule-based');
+ for(let i=0;i<normal.entities.length;i++){
+   assert.equal(ai.entities[i].x,normal.entities[i].x,'Initial world coordinates must match Normal');
+   assert.equal(ai.entities[i].y,normal.entities[i].y,'Initial world coordinates must match Normal');
+   assert.equal(ai.entities[i].age,normal.entities[i].age,'Initial age must match Normal');
+ }
+ const first=ai.entities.find(e=>e.type==='g');
+ assert.equal(first.genome.length,115,'Green must carry all neural weights');
+ assert.ok(first.genome.every(v=>Number.isFinite(v)));
+ const startGenome=first.genome.slice();
+ ai.update(.08);
+ if(first.alive)assert.deepEqual(first.genome,startGenome,'No in-life neural learning');
+ ai.run(100,.08);
+ assert.equal(ai.day,100);
+ assert.equal(ai.history.length,101);
+ assert.ok(ai.stats.ai.offspring>0,'Green offspring should inherit neural policy');
+ assert.ok(ai.stats.ai.mutatedOffspring>0,'A portion of offspring should mutate');
+ assert.ok(ai.stats.ai.highestGeneration>0,'Population should span generations');
+ assert.ok(ai.stats.ai.threatDays>=ai.stats.ai.fleeDays,'Flee duration cannot exceed danger exposure');
+ assert.ok(ai.stats.ai.fleeDays>0,'The neural escape policy must be exercised');
+ assert.ok(ai.history.some(n=>n.aiMeanGeneration>0),'Daily records should contain generation statistics');
+ for(const e of ai.entities.filter(e=>e.type==='g')){
+   assert.equal(e.genome.length,115);
+   assert.ok(e.genome.every(v=>Number.isFinite(v)),'Finite evolved weights');
+ }
+ const replay=new Lab(settings);replay.run(100,.08);
+ assert.deepEqual(ai.summary(),replay.summary(),'Neuroevolution must be reproducible at same seed and step');
+ console.log('✓ AI①の神経回路・遺伝・変異・世代交代・赤の固定行動を検証');
+}
 testLastChanceMeal();testWalls();
+testNeuroevolution();
