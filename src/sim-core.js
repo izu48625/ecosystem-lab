@@ -29,7 +29,9 @@
       this.seed=this.settings.seed||1;this.day=0;this.nextId=0;this.entities=[];
       this.grass=Array.from({length:GRID_X*GRID_Y},()=>this.rand(.5,1));
       this.history=[];this.events=[];this.effects=[];
-      this.stats={births:{g:0,r:0,b:0},deaths:{g:{hunt:0,starve:0,age:0,defense:0},r:{hunt:0,starve:0,age:0,defense:0},b:{hunt:0,starve:0,age:0,defense:0}},kills:{r:0,b:0},hunts:{r:0,b:0},strikes:{r:0,b:0},counters:0};
+      this.stats={births:{g:0,r:0,b:0},deaths:{g:{hunt:0,starve:0,age:0,defense:0},r:{hunt:0,starve:0,age:0,defense:0},b:{hunt:0,starve:0,age:0,defense:0}},kills:{r:0,b:0},hunts:{r:0,b:0},strikes:{r:0,b:0},counters:0,
+        // Exposure is the total time spent alive by all members of each species.
+        individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0}};
       for(const [k,count] of [['g',this.settings.green],['r',this.settings.red],['b',this.settings.blue]]) for(let i=0;i<count;i++) this.spawn(k,this.rand(24,W-24),this.rand(24,H-24),true);
       this.record('start','緑・赤・青の生物を同時投入');this.snapshot(0);
       return this;
@@ -47,20 +49,43 @@
     counts(){const out={g:0,r:0,b:0};for(const a of this.entities)if(a.alive)out[a.type]++;return out}
     grassTotal(){return this.grass.reduce((sum,v)=>sum+v,0)/this.grass.length}
     gridIndex(x,y){return clamp(Math.floor(y/CELL),0,GRID_Y-1)*GRID_X+clamp(Math.floor(x/CELL),0,GRID_X-1)}
-    snapshot(d){const n=this.counts();this.history.push({day:d,...n,grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters})}
+    snapshot(d){const n=this.counts();this.history.push({day:d,...n,grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters,
+        daysr:this.stats.individualDays.r,daysb:this.stats.individualDays.b,edger:this.stats.edgeDays.r,edgeb:this.stats.edgeDays.b,starvegrassg:this.stats.starveWithGlobalGrass.g})}
     particle(x,y,color,n=6){for(let i=0;i<n;i++)this.effects.push({x,y,vx:this.rand(-45,45),vy:this.rand(-45,45),life:this.rand(.25,.65),color})}
     die(a,reason,killer=null){
       if(!a.alive)return;
       a.alive=false;this.stats.deaths[a.type][reason]++;
+      if(reason==='starve'){
+        // Global grass alone cannot indicate whether an individual could reach food.
+        if(this.grassTotal()>.5)this.stats.starveWithGlobalGrass[a.type]++;
+        const ix=clamp(Math.floor(a.x/CELL),0,GRID_X-1),iy=clamp(Math.floor(a.y/CELL),0,GRID_Y-1);
+        let nearby=0;
+        for(let y=Math.max(0,iy-1);y<=Math.min(GRID_Y-1,iy+1);y++)for(let x=Math.max(0,ix-1);x<=Math.min(GRID_X-1,ix+1);x++)nearby=Math.max(nearby,this.grass[y*GRID_X+x]);
+        if(nearby>.25)this.stats.starveWithLocalGrass[a.type]++;
+      }
       if(killer && killer.alive){killer.kills++;killer.energy=clamp(killer.energy+SPECIES[killer.type].foodGain,0,100);this.stats.kills[killer.type]++;this.particle(a.x,a.y,'#ffd18b',8);
         if(this.stats.kills[killer.type]===1)this.record('hunt',(killer.type==='r'?'赤':'青')+'が初めて捕食に成功');
       }else{this.particle(a.x,a.y,reason==='starve'?'#f5b67a':'#f2adbf',4)}
       if(a.type!=='g' && reason==='starve' && this.stats.deaths[a.type].starve===1)this.record('starve',(a.type==='r'?'赤':'青')+'の個体が餓死');
     }
-    move(a,dx,dy,dt,velocity,stop=0){
-      let d=Math.hypot(dx,dy);if(d<1e-8)return;
+    move(a,dx,dy,dt,velocity,stop=0,mode='direct'){
+      const d=Math.hypot(dx,dy);if(d<1e-8)return;
+      let ux=dx/d,uy=dy/d;
+      // A fleeing or wandering creature should run *along* a wall rather than
+      // repeatedly attempt to move through it. Direct hunting remains unaffected
+      // so predators can reach prey close to a wall.
+      if(mode!=='direct'){
+        const margin=43, handed=a.id%2===0?1:-1;
+        if(a.x<margin&&ux<0){const old=-ux;ux=old*.55;uy+=handed*old*.7}
+        if(a.x>W-margin&&ux>0){const old=ux;ux=-old*.55;uy+=handed*old*.7}
+        if(a.y<margin&&uy<0){const old=-uy;uy=old*.55;ux+=handed*old*.7}
+        if(a.y>H-margin&&uy>0){const old=uy;uy=-old*.55;ux+=handed*old*.7}
+        const len=Math.hypot(ux,uy);ux/=len;uy/=len;
+      }
       const distance=Math.min(velocity*dt,Math.max(0,d-stop));
-      a.x=clamp(a.x+dx/d*distance,9,W-9);a.y=clamp(a.y+dy/d*distance,9,H-9);a.angle=Math.atan2(dy,dx);
+      const nx=clamp(a.x+ux*distance,9,W-9),ny=clamp(a.y+uy*distance,9,H-9);
+      a.angle=Math.atan2(ny-a.y,nx-a.x);
+      a.x=nx;a.y=ny;
     }
     // Spatial search: scan nearby grid buckets rather than every pair of entities.
     buildIndex(){
@@ -93,20 +118,27 @@
       for(let i=agents.length-1;i>0;i--){const j=Math.floor(this.rnd()*(i+1));[agents[i],agents[j]]=[agents[j],agents[i]]}
       for(const e of agents){
         if(!e.alive)continue;
-        const t=SPECIES[e.type];e.age+=dt;e.energy-=dt*t.drain*(e.age<t.mature?.46:1);
-        if(e.energy<=0){this.die(e,'starve');continue}
+        const t=SPECIES[e.type];
+        this.stats.individualDays[e.type]+=dt;
+        e.age+=dt;e.energy-=dt*t.drain*(e.age<t.mature?.46:1);
         if(e.age>=e.life){this.die(e,'age');continue}
+        // Hunger is checked *after* a foraging/hunting opportunity this tick.
+        // Otherwise an animal may die just before eating food already underfoot.
         if(e.type==='g'){
-          const danger=this.nearest(e,index,85*e.view,'r');const dangerB=this.nearest(e,index,85*e.view,'b');
+          // When severely hungry, a herbivore takes a controlled risk to
+          // graze unless the predator is already close. This prevents endless
+          // long-range fleeing while accessible plants remain nearby.
+          const dangerRange=(e.energy<28?48:85)*e.view;
+          const danger=this.nearest(e,index,dangerRange,'r');const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
-          if(threat){const dx=e.x-threat.x,dy=e.y-threat.y;this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1));}
+          if(threat){const dx=e.x-threat.x,dy=e.y-threat.y;this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');}
           else{
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
             for(const [vx,vy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=clamp(cx+vx,0,GRID_X-1),ny=clamp(cy+vy,0,GRID_Y-1),n=this.grass[ny*GRID_X+nx];if(n>food+.18){food=n;tx=(nx+.5)*CELL;ty=(ny+.5)*CELL}}
             if(this.day>=e.turnAt){e.turnAt=this.day+this.rand(.22,.65);e.angle+=this.rand(-1.7,1.7)}
             const dx=tx!==null?tx-e.x:Math.cos(e.angle),dy=ty!==null?ty-e.y:Math.sin(e.angle);
-            this.move(e,dx,dy,dt,55*e.speed);
+            this.move(e,dx,dy,dt,55*e.speed,0,'wander');
           }
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
           if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
@@ -136,10 +168,12 @@
             }
           }else{
             e.targetId=null;if(this.day>=e.turnAt){e.turnAt=this.day+this.rand(.16,.55);e.angle+=this.rand(-1.8,1.8)}
-            this.move(e,Math.cos(e.angle),Math.sin(e.angle),dt,75*e.speed);
+            this.move(e,Math.cos(e.angle),Math.sin(e.angle),dt,75*e.speed,0,'wander');
           }
         }
         if(!e.alive)continue;
+        if(e.x<28||e.x>W-28||e.y<28||e.y>H-28)this.stats.edgeDays[e.type]+=dt;
+        if(e.energy<=0){this.die(e,'starve');continue}
         if(e.energy>62 && e.hp<e.maxhp)e.hp=Math.min(e.maxhp,e.hp+dt*t.hp*.045);
         const canBirth=e.age>=t.mature&&this.day-e.lastBirth>=t.reproduction&&e.energy>=t.birthEnergy;
         const fertility=e.type==='g'?clamp((foodAvailability-.05)/.38,.05,1):1;
