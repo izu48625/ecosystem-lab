@@ -200,6 +200,14 @@ $('single').onclick=()=>advanceTo(Math.floor(lab.day)+1);
 $('jump10').onclick=()=>advanceTo(lab.day+10);
 $('jump100').onclick=()=>advanceTo(lab.day+100);
 $('csv').onclick=exportCSV;
+$('openReport').onclick=()=>{
+ if(activeTab==='ai2')return;
+ playing=false;accum=0;show();
+ window.EcosystemReport.render(lab);
+};
+$('closeReport').onclick=()=>window.EcosystemReport.close();
+$('reportReturn').onclick=()=>window.EcosystemReport.close();
+$('reportSavePng').onclick=()=>window.EcosystemReport.exportPNG();
 $('unselect').onclick=()=>{focus=null;zoom=1};$('zin').onclick=()=>{zoom=Math.min(4,zoom*1.45)};$('zout').onclick=()=>{zoom=Math.max(1,zoom/1.45)};$('zreset').onclick=()=>{focus=null;zoom=1};
 $('variance').oninput=()=>{$('varText').textContent='±'+$('variance').value+'%'};$('regrowth').oninput=()=>{$('regText').textContent=$('regrowth').value+'%'};
 document.querySelectorAll('#speeds button').forEach(btn=>btn.onclick=()=>{speed=Number(btn.dataset.s);document.querySelectorAll('#speeds button').forEach(b=>b.classList.toggle('active',b===btn))});
