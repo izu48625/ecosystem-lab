@@ -1,0 +1,36 @@
+{
+  "version": "v0.3",
+  "period": "100 days",
+  "seedStart": 20261117,
+  "seedEnd": 20261216,
+  "runs": 100,
+  "conditions": {
+    "initialGreen": 100,
+    "initialRed": 10,
+    "initialBlue": 10,
+    "variation": "±10%",
+    "grassRegrowth": "100%"
+  },
+  "outcomes": {
+    "bothPredatorsAlive": 45,
+    "redOnlyAlive": 12,
+    "blueOnlyAlive": 7,
+    "noPredatorsAlive": 36
+  },
+  "meanFinalCounts": {
+    "green": 124.8,
+    "red": 5.2,
+    "blue": 2.3
+  },
+  "meanPredation": {
+    "red": 162,
+    "blue": 278.2
+  },
+  "killsPer100PredatorIndividualDays": {
+    "red": 14.23,
+    "blue": 33.75
+  },
+  "meanGreenStarvations": 220.7,
+  "fractionGreenStarvedWithGrassNearby": 0.966,
+  "notes": "These are seeded simulation outputs, not predictions of real ecosystems. Local grass proximity does not establish that grass was reachable."
+}
