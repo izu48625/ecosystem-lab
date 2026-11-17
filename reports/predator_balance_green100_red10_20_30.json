@@ -1,0 +1,74 @@
+{
+  "title": "Normal baseline red predator count balance",
+  "model": "ECOSYSTEM LAB v0.3",
+  "created": "2026-11-17",
+  "seedRange": {
+    "start": 20261117,
+    "end": 20261216
+  },
+  "runsPerSetting": 100,
+  "durationDays": 100,
+  "step": 0.08,
+  "sharedSettings": {
+    "green": 100,
+    "blue": 0,
+    "variance": 10,
+    "regrowth": 100,
+    "ai": false
+  },
+  "conditions": [
+    {
+      "red": 10,
+      "bothSurvivePct": 99,
+      "greenExtinctPct": 1,
+      "redExtinctPct": 0,
+      "meanFinalGreen": 118.65,
+      "meanFinalRed": 35.77,
+      "medianFinalGreen": 108,
+      "medianFinalRed": 36,
+      "meanGreenHunted": 441.94,
+      "meanGreenStarved": 729.38,
+      "meanRedStarved": 22.58,
+      "meanGreenBirths": 1469.82,
+      "meanRedBirths": 93.91
+    },
+    {
+      "red": 20,
+      "bothSurvivePct": 71,
+      "greenExtinctPct": 18,
+      "redExtinctPct": 28,
+      "meanFinalGreen": 68.77,
+      "meanFinalRed": 11.65,
+      "medianFinalGreen": 48,
+      "medianFinalRed": 9.5,
+      "meanGreenHunted": 468.42,
+      "meanGreenStarved": 274.49,
+      "meanRedStarved": 63.2,
+      "meanGreenBirths": 832.99,
+      "meanRedBirths": 102.45
+    },
+    {
+      "red": 30,
+      "bothSurvivePct": 44,
+      "greenExtinctPct": 36,
+      "redExtinctPct": 56,
+      "meanFinalGreen": 93.41,
+      "meanFinalRed": 4.95,
+      "medianFinalGreen": 25,
+      "medianFinalRed": 0,
+      "meanGreenHunted": 367.32,
+      "meanGreenStarved": 135.91,
+      "meanRedStarved": 71.85,
+      "meanGreenBirths": 559.98,
+      "meanRedBirths": 80.51
+    }
+  ],
+  "selectedInitialRed": 20,
+  "selectionRationale": "71% co-survival and meaningful extinction probability; avoids the near-certain coexistence at red10 or frequent extinction at red30",
+  "cautions": [
+    "Not an ecological forecast",
+    "Co-survival is measured at day100, not proof of long-term persistence",
+    "Green starvation is influenced by the model's simplified food and escape rules",
+    "Evolution could change the population balance"
+  ]
+}
