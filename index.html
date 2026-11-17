@@ -34,7 +34,7 @@
 <section id="view-normal" class="tabview" role="tabpanel" aria-labelledby="tabButtonNormal">
 <div class="pane balanceIntro">
   <h2>ノーマル実験：緑100匹 × 赤の頭数を比較</h2>
-  <div class="tiny">まずは赤10・20・30匹の3条件を100日間で検証。AI①・AI②でも同じ初期条件を使えるようにします。青は今回の比較から除外。</div>
+  <div class="tiny">まずは赤10・20・30匹の3条件を100日間で検証。100日以降も終了せず、任意の日まで観察できます。AI①・AI②でも同じ初期条件を使えるようにします。青は今回の比較から除外。</div>
   <div class="presets"><span class="muted">すぐに実験：</span><button type="button" class="small" id="preset10">緑100・赤10</button><button type="button" class="small" id="preset20">緑100・赤20</button><button type="button" class="small" id="preset30">緑100・赤30</button><span class="muted">押すとDAY0からやり直し</span></div>
 </div>
 <div class="pane balanceIntro" id="balanceStudy" aria-label="初期個体数の検証結果">
@@ -46,7 +46,7 @@
  </tbody></table>
  <div class="mutebot">赤20匹を仮の標準値に採用。緑・赤とも100日後に生存した割合を表示。赤20匹では緑絶滅18%、赤絶滅28%。100シード（20261117〜20261216）、草再生100%、個体差±10%、学習なし。これは仮想モデルの結果で、現実の生存率ではありません。</div>
 </div>
-<div class="tool"><button class="primary" id="toggle">⏸ 一時停止</button><button id="reset">↻ 最初から</button><div class="speedset" id="speeds"><button data-s="1">1×</button><button data-s="5" class="active">5×</button><button data-s="20">20×</button></div><button id="single" class="small">+1日</button><button id="newseed" class="small">🎲 別の展開</button><button id="csv" class="small">↓ 統計CSV</button><span class="daylabel" id="day">DAY 0.0 / 100</span></div>
+<div class="tool"><button class="primary" id="toggle">⏸ 一時停止</button><button id="reset">↻ 最初から</button><div class="speedset" id="speeds"><button data-s="1">1×</button><button data-s="5" class="active">5×</button><button data-s="20">20×</button></div><button id="single" class="small">+1日</button><button id="jump10" class="small">+10日</button><button id="jump100" class="small">+100日</button><button id="newseed" class="small">🎲 別の展開</button><button id="csv" class="small">↓ 統計CSV</button><span class="daylabel" id="day">DAY 0.0 ｜ 継続中</span></div>
 <div class="layout"><div class="stage"><canvas id="world" width="960" height="600" aria-label="生態系のシミュレーション表示"></canvas><div class="watermark">LIVE ECOSYSTEM</div><div class="hint">生物をタップすると個体情報・追跡</div><div class="zoom"><button id="zout" title="縮小">−</button><button id="zreset" title="全体表示">全体</button><button id="zin" title="拡大">＋</button></div></div><div class="side">
 <div class="pane"><div class="sect">生存個体数</div><div class="sp"><span class="circle" style="background:#70e19d"></span><span class="spname">緑</span><span class="spnum" id="ng" style="color:#7de2a5">100</span></div><div class="sp"><span class="circle" style="background:#ff7b70"></span><span class="spname">赤</span><span class="spnum" id="nr" style="color:#ff9586">20</span></div><div class="sp legacy-blue"><span class="circle" style="background:#73a7ff"></span><span class="spname">青</span><span class="spnum" id="nb" style="color:#88b5ff">10</span></div><div class="meter"><div class="fill" id="grassbar" style="width:75%;background:#6bc18d"></div></div><div class="muted" style="margin-top:5px">草の残量 <span id="grass">75%</span></div></div>
 <div class="pane"><div class="sect">直近の出来事</div><div class="ev" id="event"><span class="eventday">DAY 0</span>2種類の生物を同じ生態系に投入しました。</div><div class="muted">実際のシミュレーションから記録</div></div>
@@ -66,6 +66,6 @@
   <p>緑100匹が仲間との距離や方向合わせを世代交代で進化させる100日間の実験。群れの形成は強制せず、生存に有利なら広がるか検証します。</p>
   <p>AI①と同じ初期頭数・草・赤の能力を使い、このタブに独立した100日間シミュレーションを用意します。</p></div>
 </section>
-<div class="mutebot">ECOSYSTEM LAB v0.3 ベースライン＋3タブ構成：食事後の餓死判定・壁際の逃走補正・個体日あたりの捕食効率を追加。AI学習はまだ未実装です。</div><div class="mutebot">※AI①・AI②は現時点で未実装です。ノーマルだけが操作可能です。</div><div class="mutebot">※自作のゲーム内モデルです。現実の生態系の予測ではありません。まず動きと演出の試作を目的としているため、結果はランダム性を含みます。シードを固定すると同じ条件の再現ができます。</div></div>
+<div class="mutebot">ECOSYSTEM LAB v0.3 ベースライン＋3タブ構成：食事後の餓死判定・壁際の逃走補正・個体日あたりの捕食効率を追加。AI学習はまだ未実装です。</div><div class="mutebot">※100日は検証・比較の基準日であり、ノーマル実験の終了日ではありません。100日を超えても再生・一時停止・日数送り・グラフ更新・統計CSV出力が続きます。※AI①・AI②は現時点で未実装です。ノーマルだけが操作可能です。</div><div class="mutebot">※自作のゲーム内モデルです。現実の生態系の予測ではありません。まず動きと演出の試作を目的としているため、結果はランダム性を含みます。シードを固定すると同じ条件の再現ができます。</div></div>
 <script src="src/sim-core.js"></script>
 <script src="src/ui.js"></script></body></html>
