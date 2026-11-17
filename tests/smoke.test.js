@@ -35,7 +35,30 @@ function testNoPredators(){
  assert.equal(a.stats.kills.r,0);assert.equal(a.stats.kills.b,0);
  console.log('✓ 肉食0匹の境界条件を確認');
 }
-testDefault();testSpecies();testNoPredators();
+function testUnlimitedBeyond100(){
+ const settings={seed:20261117,green:100,red:20,blue:0,duration:Infinity};
+ const a=new Lab(settings);
+ a.run(100,.08);
+ const checkpoint={historyCount:a.history.length,kills:a.stats.kills.r,births:a.stats.births.g};
+ assert.equal(a.day,100,'DAY100 is still a checkpoint');
+ assert.equal(checkpoint.historyCount,101);
+ a.run(150,.08);
+ assert.equal(a.day,150,'Simulation must continue beyond DAY100');
+ assert.equal(a.history.length,151,'Daily history must extend continuously');
+ assert.equal(a.history[100].day,100);
+ assert.equal(a.history[150].day,150);
+ assert.ok(a.stats.kills.r>=checkpoint.kills);
+ assert.ok(a.stats.births.g>=checkpoint.births);
+ assert.ok(a.events.every(e=>e.kind!=='end'),'Unlimited simulation must not emit end event');
+ a.run(200,.08);
+ assert.equal(a.history.at(-1).day,200);
+ const b=new Lab(settings);b.run(100,.08);b.run(150,.08);b.run(200,.08);
+ assert.deepEqual(a.summary(),b.summary(),'Replay across day100/150/200 is deterministic');
+ const c=new Lab({seed:20261117,green:100,red:20,blue:0});
+ c.run();assert.equal(c.day,100,'Finite benchmark still ends at 100 days by default');
+ console.log('✓ DAY100, DAY150, DAY200への継続と統計記録を確認');
+}
+testDefault();testSpecies();testNoPredators();testUnlimitedBeyond100();
 
 function testLastChanceMeal(){
  const lab=new Lab({seed:1,green:1,red:0,blue:0});
