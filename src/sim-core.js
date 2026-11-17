@@ -193,7 +193,7 @@
       if(today>oldDay){for(let d=oldDay+1;d<=today;d++){this.snapshot(d);if(d%20===0){const n=this.counts();this.record('milestone',`緑${n.g}匹、赤${n.r}匹、青${n.b}匹が生存`)}}}
       if(Number.isFinite(this.settings.duration)&&this.day>=this.settings.duration)this.record('end',`${this.settings.duration}日間の実験終了`);
     }
-    run(days=this.settings.duration,step=.08){let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
+    run(days=Number.isFinite(this.settings.duration)?this.settings.duration:this.day+100,step=.08){if(!Number.isFinite(days))throw new RangeError('Run target day must be finite');let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
     summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history}}
   }
   return {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL};
