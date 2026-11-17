@@ -60,6 +60,10 @@ function show(){
  for(const t of ['g','r','b']){$('birth'+t).textContent=s.births[t];$('death'+t).textContent=s.deaths[t].starve+' / '+s.deaths[t].age+' / '+s.deaths[t].hunt+' / '+s.deaths[t].defense}
  $('killsr').textContent=s.kills.r;$('killsb').textContent=s.kills.b;$('counter').textContent=s.counters;
  $('rateR').textContent=s.hunts.r?Math.round(s.kills.r/s.hunts.r*100)+'%':'—';$('rateB').textContent=s.hunts.b?Math.round(s.kills.b/s.hunts.b*100)+'%':'—';
+ $('effR').textContent=s.individualDays.r?(s.kills.r/s.individualDays.r*100).toFixed(1):'—';
+ $('effB').textContent=s.individualDays.b?(s.kills.b/s.individualDays.b*100).toFixed(1):'—';
+ for(const [t,id] of [['g','edgeG'],['r','edgeR'],['b','edgeB']])$(id).textContent=s.individualDays[t]?(100*s.edgeDays[t]/s.individualDays[t]).toFixed(1)+'%':'—';
+ $('nearStarveG').textContent=s.starveWithLocalGrass.g;
  const e=lab.events[0];$('event').textContent=e?`DAY ${Math.floor(e.day)} — ${e.text}`:'';
  const sel=lab.entities.find(e=>e.id===focus);
  $('selected').textContent=sel?`#${sel.id}｜${SPECIES[sel.type].name}\nHP ${Math.ceil(sel.hp)}/${Math.ceil(sel.maxhp)}｜エネルギー ${Math.ceil(sel.energy)}%｜年齢 ${sel.age.toFixed(1)}/${sel.life.toFixed(1)}日｜攻撃力 ${sel.attack.toFixed(1)}｜移動 ${sel.speed.toFixed(2)}｜捕食 ${sel.kills}｜子 ${sel.children}｜反撃 ${sel.counters}`:'生物をタップすると、HP・年齢・エネルギー・個体記録を表示します。';
@@ -73,7 +77,7 @@ function frame(t){
  draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}requestAnimationFrame(frame)
 }
 function exportCSV(){
- const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters'];
+ const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg'];
  const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]).join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ecosystem_seed_${lab.settings.seed}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
