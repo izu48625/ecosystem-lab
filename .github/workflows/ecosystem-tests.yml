@@ -15,5 +15,7 @@ jobs:
         run: node tests/smoke.test.js
       - name: Verify UI callbacks
         run: node tests/ui-smoke.js
+      - name: Verify DAY30 Q-learning and paired replay
+        run: node tests/learning.test.js
       - name: Simulate 100 reproducible worlds
         run: node tests/montecarlo.js 100
