@@ -5,7 +5,7 @@ const $=id=>document.getElementById(id), {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL}=wi
 const cv=$('world'),c=cv.getContext('2d'),pop=$('chart'),popCtx=pop.getContext('2d'),pred=$('predChart'),predCtx=pred.getContext('2d');
 let lab,playing=true,ended=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0,activeTab='normal',resumeWhenNormal=false;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value)}}
+function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value),duration:Infinity}}
 function reset(){lab=new Lab(options());playing=true;ended=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};show();draw();drawCharts()}
 function creature(e){
  c.save();c.translate(e.x,e.y);c.rotate(e.angle);const sz=e.type==='g'?.88:e.type==='r'?1.08:1.22;c.scale(sz,sz);
@@ -44,18 +44,26 @@ function draw(){
  for(const fx of lab.effects){c.globalAlpha=clamp(fx.life*3,0,1);c.fillStyle=fx.color;c.beginPath();c.arc(fx.x,fx.y,3,0,Math.PI*2);c.fill()}c.globalAlpha=1;c.restore();
 }
 function chartDraw(canvas,ctx,keys){
- const w=canvas.width,h=canvas.height,left=45,right=14,top=12,bottom=27,history=lab.history;
- const ymax=Math.max(10,...history.map(n=>Math.max(...keys.map(k=>n[k]))));const ceiling=Math.ceil(ymax/(ymax>100?50:10))*(ymax>100?50:10);
- const px=d=>left+d/100*(w-left-right),py=v=>top+(1-v/ceiling)*(h-top-bottom);
+ const w=canvas.width,h=canvas.height,left=45,right=14,top=12,bottom=27;
+ // Every 100 days the timeline expands; after 400 days show a moving 400-day window.
+ // This preserves readable lines/ticks as the experiment runs indefinitely.
+ const xEnd=Math.max(100,Math.ceil(Math.max(100,lab.day)/100)*100);
+ const xStart=Math.max(0,xEnd-400),range=xEnd-xStart;
+ const visible=lab.history.filter(n=>n.day>=xStart&&n.day<=xEnd);
+ const ymax=visible.reduce((max,n)=>Math.max(max,...keys.map(k=>n[k])),10);
+ const ceiling=Math.ceil(ymax/(ymax>100?50:10))*(ymax>100?50:10);
+ const px=d=>left+(d-xStart)/range*(w-left-right),py=v=>top+(1-v/ceiling)*(h-top-bottom);
  ctx.fillStyle='#102022';ctx.fillRect(0,0,w,h);ctx.lineWidth=1;ctx.font='12px system-ui';ctx.textAlign='right';
  for(let i=0;i<=4;i++){const value=ceiling*i/4,y=py(value);ctx.strokeStyle='#35504a';ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();ctx.fillStyle='#a7c4b9';ctx.fillText(Math.round(value),left-8,y+4)}
- ctx.textAlign='center';for(let i=0;i<=100;i+=20){ctx.fillStyle='#94b1aa';ctx.fillText(i+'日',px(i),h-5)}
- for(const k of keys){ctx.strokeStyle=SPECIES[k].color;ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();history.forEach((n,i)=>{if(!i)ctx.moveTo(px(n.day),py(n[k]));else ctx.lineTo(px(n.day),py(n[k]))});ctx.stroke()}
+ ctx.textAlign='center';
+ for(let i=0;i<=5;i++){const d=xStart+range*i/5;ctx.fillStyle='#94b1aa';ctx.fillText(Math.round(d)+'日',px(d),h-5)}
+ for(const k of keys){ctx.strokeStyle=SPECIES[k].color;ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();
+   visible.forEach((n,i)=>{if(!i)ctx.moveTo(px(n.day),py(n[k]));else ctx.lineTo(px(n.day),py(n[k]))});ctx.stroke()}
  ctx.strokeStyle='#d4efda88';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(px(lab.day),top);ctx.lineTo(px(lab.day),h-bottom);ctx.stroke();ctx.setLineDash([]);
 }
 function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r'])}
 function show(){
- const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} / 100`;
+ const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} ｜ 継続中`;
  const grass=(100*lab.grassTotal()).toFixed(0)+'%';$('grass').textContent=grass;$('grassbar').style.width=grass;
  for(const t of ['g','r','b']){$('birth'+t).textContent=s.births[t];$('death'+t).textContent=s.deaths[t].starve+' / '+s.deaths[t].age+' / '+s.deaths[t].hunt+' / '+s.deaths[t].defense}
  $('killsr').textContent=s.kills.r;$('killsb').textContent=s.kills.b;$('counter').textContent=s.counters;
@@ -68,12 +76,12 @@ function show(){
  const sel=lab.entities.find(e=>e.id===focus);
  $('selected').textContent=sel?`#${sel.id}｜${SPECIES[sel.type].name}\nHP ${Math.ceil(sel.hp)}/${Math.ceil(sel.maxhp)}｜エネルギー ${Math.ceil(sel.energy)}%｜年齢 ${sel.age.toFixed(1)}/${sel.life.toFixed(1)}日｜攻撃力 ${sel.attack.toFixed(1)}｜移動 ${sel.speed.toFixed(2)}｜捕食 ${sel.kills}｜子 ${sel.children}｜反撃 ${sel.counters}`:'生物をタップすると、HP・年齢・エネルギー・個体記録を表示します。';
  $('toggle').textContent=ended?'✓ 実験終了':playing?'⏸ 一時停止':'▶ 再開';$('toggle').disabled=ended;
- $('stateText').textContent=ended?'100日間の実験終了':playing?'シミュレーション実行中':'一時停止中';
+ $('stateText').textContent=playing?'シミュレーション実行中':'一時停止中';
 }
 let last=0;
 function frame(t){
  if(!last)last=t;const dt=Math.min(.15,(t-last)/1000);last=t;
- if(playing&&!ended){accum+=dt*.68*speed;let loops=0;while(accum>.08&&loops<95&&lab.day<100){lab.update(.08);accum-=.08;loops++}if(lab.day>=100){ended=true;playing=false}}
+ if(playing&&!ended){accum+=dt*.68*speed;let loops=0;while(accum>.08&&loops<95){lab.update(.08);accum-=.08;loops++}}
  if(activeTab==='normal'){draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}}requestAnimationFrame(frame)
 }
 function exportCSV(){
@@ -101,7 +109,10 @@ $('preset20').onclick=()=>usePreset(20);
 $('preset30').onclick=()=>usePreset(30);
 $('toggle').onclick=()=>{if(!ended)playing=!playing;show()};$('reset').onclick=reset;
 $('newseed').onclick=()=>{$('seed').value=Number($('seed').value)+1;reset()};
-$('single').onclick=()=>{if(ended)return;playing=false;lab.run(Math.min(100,Math.floor(lab.day)+1),.08);if(lab.day>=100)ended=true;show();draw();drawCharts()};
+function advanceTo(day){playing=false;lab.run(day,.08);show();draw();drawCharts()}
+$('single').onclick=()=>advanceTo(Math.floor(lab.day)+1);
+$('jump10').onclick=()=>advanceTo(lab.day+10);
+$('jump100').onclick=()=>advanceTo(lab.day+100);
 $('csv').onclick=exportCSV;
 $('unselect').onclick=()=>{focus=null;zoom=1};$('zin').onclick=()=>{zoom=Math.min(4,zoom*1.45)};$('zout').onclick=()=>{zoom=Math.max(1,zoom/1.45)};$('zreset').onclick=()=>{focus=null;zoom=1};
 $('variance').oninput=()=>{$('varText').textContent='±'+$('variance').value+'%'};$('regrowth').oninput=()=>{$('regText').textContent=$('regrowth').value+'%'};
