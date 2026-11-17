@@ -146,9 +146,15 @@
       return best;
     }
     update(dt=.05){
-      if(this.day>=this.settings.duration)return;      dt=Math.min(dt,this.settings.duration-this.day);
+      if(this.day>=this.settings.duration)return;
+      if(this.settings.aiEnabled&&!this.learning.active&&this.day>=this.settings.aiStartDay){
+        this.learning.active=true;this.record('learn','AI学習が解禁。3種が行動方針を経験から学び始めます');
+      }
+      dt=Math.min(dt,this.settings.duration-this.day);
       if(dt<=0)return;
-      const oldDay=Math.floor(this.day);this.day+=dt;
+      const oldDay=Math.floor(this.day);
+      // Quantized time ensures a DAY30 split matches continuous execution.
+      this.day=Number((this.day+dt).toFixed(6));
       if(this.settings.duration-this.day<1e-8)this.day=this.settings.duration;
       for(let i=0;i<this.grass.length;i++)this.grass[i]=Math.min(1,this.grass[i]+dt*.18*this.settings.regrowth*(.8+.4*((i*17)%13)/12));
       const index=this.buildIndex(), newborn=[];
@@ -162,16 +168,18 @@
         this.stats.individualDays[e.type]+=dt;
         e.age+=dt;e.energy-=dt*t.drain*(e.age<t.mature?.46:1);
         if(e.age>=e.life){this.die(e,'age');continue}
+        if(this.learning.active)this.chooseLearnedAction(e);
         // Hunger is checked *after* a foraging/hunting opportunity this tick.
         // Otherwise an animal may die just before eating food already underfoot.
         if(e.type==='g'){
           // When severely hungry, a herbivore takes a controlled risk to
           // graze unless the predator is already close. This prevents endless
           // long-range fleeing while accessible plants remain nearby.
-          const dangerRange=(e.energy<28?48:85)*e.view;
+          const escapeStrategy=e.ai?e.ai.action:1;
+          const dangerRange=(e.energy<28?48:85)*e.view*(e.ai?[1.15,1,.85][escapeStrategy]:1);
           const danger=this.nearest(e,index,dangerRange,'r');const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
-          if(threat){const dx=e.x-threat.x,dy=e.y-threat.y;this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');}
+          if(threat){const dx=e.x-threat.x,dy=e.y-threat.y;this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1)*(e.ai?[1.04,1,.98][escapeStrategy]:1),0,'flee');}
           else{
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
@@ -183,7 +191,10 @@
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
           if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
         }else{
-          const needsFood=e.energy<(e.type==='r'?55:64);
+          const strategy=e.ai?e.ai.action:1;
+          const thresholds=e.type==='r'?[50,55,64]:[57,64,73];
+          const needsFood=e.energy<thresholds[strategy];
+          if(e.ai&&strategy===2)e.energy-=dt*2;
           let target=null;
           if(needsFood){
             if(e.targetId)target=this.entities.find(a=>a.id===e.targetId&&a.alive&&a.type==='g');
@@ -230,10 +241,13 @@
       this.effects=this.effects.filter(p=>p.life>0);
       const today=Math.floor(this.day);
       if(today>oldDay){for(let d=oldDay+1;d<=today;d++){this.snapshot(d);if(d%20===0){const n=this.counts();this.record('milestone',`緑${n.g}匹、赤${n.r}匹、青${n.b}匹が生存`)}}}
-      if(this.day>=this.settings.duration)this.record('end',`${this.settings.duration}日間の実験終了`);
+      if(this.day>=this.settings.duration){
+        if(this.learning.active){for(const e of this.entities)if(e.ai){this.learnFromExperience(e,false);e.ai=null}}
+        this.record('end',`${this.settings.duration}日間の実験終了`);
+      }
     }
-    run(days=this.settings.duration,step=.08){let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
-    summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history}}
+    run(days=this.settings.duration,step=.08){let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,Number((to-this.day).toFixed(6))));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
+    summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history,learning:this.learning}}
   }
   return {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL};
 });
