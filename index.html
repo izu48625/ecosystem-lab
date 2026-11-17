@@ -34,7 +34,7 @@
 <section id="view-normal" class="tabview" role="tabpanel" aria-labelledby="tabButtonNormal">
 <div class="pane balanceIntro">
   <h2>ノーマル実験：緑100匹 × 赤の頭数を比較</h2>
-  <div class="tiny">まずは赤10・20・30匹の3条件を100日間で検証。100日以降も終了せず、任意の日まで観察できます。AI①・AI②でも同じ初期条件を使えるようにします。青は今回の比較から除外。</div>
+  <div class="tiny">まずは赤10・20・30匹の3条件を100日間で検証。DAY100で一度だけ自動停止し、▶を押すとDAY101以降も止まらず観察できます。AI①・AI②でも同じ初期条件を使えるようにします。青は今回の比較から除外。</div>
   <div class="presets"><span class="muted">すぐに実験：</span><button type="button" class="small" id="preset10">緑100・赤10</button><button type="button" class="small" id="preset20">緑100・赤20</button><button type="button" class="small" id="preset30">緑100・赤30</button><span class="muted">押すとDAY0からやり直し</span></div>
 </div>
 <div class="pane balanceIntro" id="balanceStudy" aria-label="初期個体数の検証結果">
@@ -66,6 +66,6 @@
   <p>緑100匹が仲間との距離や方向合わせを世代交代で進化させる100日間の実験。群れの形成は強制せず、生存に有利なら広がるか検証します。</p>
   <p>AI①と同じ初期頭数・草・赤の能力を使い、このタブに独立した100日間シミュレーションを用意します。</p></div>
 </section>
-<div class="mutebot">ECOSYSTEM LAB v0.3 ベースライン＋3タブ構成：食事後の餓死判定・壁際の逃走補正・個体日あたりの捕食効率を追加。AI学習はまだ未実装です。</div><div class="mutebot">※100日は検証・比較の基準日であり、ノーマル実験の終了日ではありません。100日を超えても再生・一時停止・日数送り・グラフ更新・統計CSV出力が続きます。※AI①・AI②は現時点で未実装です。ノーマルだけが操作可能です。</div><div class="mutebot">※自作のゲーム内モデルです。現実の生態系の予測ではありません。まず動きと演出の試作を目的としているため、結果はランダム性を含みます。シードを固定すると同じ条件の再現ができます。</div></div>
+<div class="mutebot">ECOSYSTEM LAB v0.3 ベースライン＋3タブ構成：食事後の餓死判定・壁際の逃走補正・個体日あたりの捕食効率を追加。AI学習はまだ未実装です。</div><div class="mutebot">※DAY100で一度だけ自動的に一時停止します。▶「100日以降を再生」を押せば101日以降も続行し、200日目などで再停止しません。+1日・+10日・+100日も最初のDAY100をまたぐときは一度止まります。グラフとCSVはその先も更新します。※AI①・AI②は現時点で未実装です。ノーマルだけが操作可能です。</div><div class="mutebot">※自作のゲーム内モデルです。現実の生態系の予測ではありません。まず動きと演出の試作を目的としているため、結果はランダム性を含みます。シードを固定すると同じ条件の再現ができます。</div></div>
 <script src="src/sim-core.js"></script>
 <script src="src/ui.js"></script></body></html>
