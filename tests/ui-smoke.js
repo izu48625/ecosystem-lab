@@ -10,7 +10,14 @@ function element(id){
  return elements.get(id);
 }
 const speedButtons=[1,5,20].map(v=>({dataset:{s:String(v)},classList:{toggle:noop},onclick:null}));
-const dom={getElementById:element,querySelectorAll:()=>speedButtons,createElement:()=>({click:noop})};
+let pngDownloads=0;
+const dom={
+ getElementById:element,querySelectorAll:()=>speedButtons,
+ body:{appendChild:noop},
+ createElement:tag=>tag==='canvas'?
+   {width:0,height:0,getContext:()=>context2d,toBlob:cb=>cb({type:'image/png'})}:
+   {click:()=>{pngDownloads++},remove:noop}
+};
 let requested=0,nextFrame=null;
 const appContext={document:dom,window:{EcosystemCore},requestAnimationFrame:fn=>{requested++;nextFrame=fn},setTimeout:noop,URL:{createObjectURL:()=>'',revokeObjectURL:noop},Blob:class{},console,Math,Number};
 vm.createContext(appContext);
@@ -47,6 +54,8 @@ assert.ok(Number(element('rrMutation').textContent.replaceAll(',',''))>0,'Mutate
 assert.ok(Number(element('rrMaxGen').textContent)>0,'Reached generation shown even after extinction');
 assert.ok(Number(element('rrPeakGen').textContent)>=0,'Historical peak generation shown');
 assert.ok(element('reportMeta').textContent.includes('DAY 100.0'));
+element('reportSavePng').onclick();
+assert.ok(pngDownloads>0,'Screenshot report can be exported as a single PNG');
 element('reportReturn').onclick();
 assert.equal(element('reportOverlay').hidden,true);
 assert.ok(element('day').textContent.includes('DAY 100.0'),'Opening report does not reset AI simulation');
