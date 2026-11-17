@@ -3,9 +3,9 @@
 'use strict';
 const $=id=>document.getElementById(id), {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL}=window.EcosystemCore;
 const cv=$('world'),c=cv.getContext('2d'),pop=$('chart'),popCtx=pop.getContext('2d'),pred=$('predChart'),predCtx=pred.getContext('2d');
-let lab,playing=true,ended=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0;
+let lab,playing=true,ended=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0,activeTab='normal',resumeWhenNormal=false;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:Number($('startb').value),variance:Number($('variance').value),regrowth:Number($('regrowth').value)}}
+function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value)}}
 function reset(){lab=new Lab(options());playing=true;ended=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};show();draw();drawCharts()}
 function creature(e){
  c.save();c.translate(e.x,e.y);c.rotate(e.angle);const sz=e.type==='g'?.88:e.type==='r'?1.08:1.22;c.scale(sz,sz);
@@ -53,7 +53,7 @@ function chartDraw(canvas,ctx,keys){
  for(const k of keys){ctx.strokeStyle=SPECIES[k].color;ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();history.forEach((n,i)=>{if(!i)ctx.moveTo(px(n.day),py(n[k]));else ctx.lineTo(px(n.day),py(n[k]))});ctx.stroke()}
  ctx.strokeStyle='#d4efda88';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(px(lab.day),top);ctx.lineTo(px(lab.day),h-bottom);ctx.stroke();ctx.setLineDash([]);
 }
-function drawCharts(){chartDraw(pop,popCtx,['g','r','b']);chartDraw(pred,predCtx,['r','b'])}
+function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r'])}
 function show(){
  const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} / 100`;
  const grass=(100*lab.grassTotal()).toFixed(0)+'%';$('grass').textContent=grass;$('grassbar').style.width=grass;
@@ -81,6 +81,24 @@ function exportCSV(){
  const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]).join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ecosystem_seed_${lab.settings.seed}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
+// Each future AI world lives in a separate tab, and no unfinished AI code is run.
+function switchTab(next){
+ if(next===activeTab)return;
+ if(activeTab==='normal'){resumeWhenNormal=playing;playing=false}
+ activeTab=next;
+ for(const [key,view,button] of [['normal','view-normal','tabButtonNormal'],['ai1','view-ai1','tabButtonAi1'],['ai2','view-ai2','tabButtonAi2']]){
+   $(view).hidden=key!==next;$(button).setAttribute('aria-selected',String(key===next));
+ }
+ if(next==='normal'){playing=resumeWhenNormal&&!ended;show();draw();drawCharts()}
+ else{$('stateText').textContent='AIタブは設計中';$('dot').style.background='#8baaa4'}
+}
+$('tabButtonNormal').onclick=()=>switchTab('normal');
+$('tabButtonAi1').onclick=()=>switchTab('ai1');
+$('tabButtonAi2').onclick=()=>switchTab('ai2');
+function usePreset(red){$('startg').value=100;$('startr').value=red;$('startb').value=0;reset()}
+$('preset10').onclick=()=>usePreset(10);
+$('preset20').onclick=()=>usePreset(20);
+$('preset30').onclick=()=>usePreset(30);
 $('toggle').onclick=()=>{if(!ended)playing=!playing;show()};$('reset').onclick=reset;
 $('newseed').onclick=()=>{$('seed').value=Number($('seed').value)+1;reset()};
 $('single').onclick=()=>{if(ended)return;playing=false;lab.run(Math.min(100,Math.floor(lab.day)+1),.08);if(lab.day>=100)ended=true;show();draw();drawCharts()};
@@ -92,13 +110,13 @@ cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect(),sx=(e.c
 for(const a of lab.entities){const d=Math.hypot(a.x-x,a.y-y);if(d<bestD){bestD=d;best=a}}if(best){focus=best.id;zoom=Math.max(zoom,1.7);cam.x=best.x;cam.y=best.y}else{focus=null;if(zoom>1){cam.x=x;cam.y=y}}show()});
 $('batch').onclick=async()=>{
  if($('batch').disabled)return;
- const btn=$('batch'),wasPlaying=playing;playing=false;btn.disabled=true;$('batchResult').textContent='10回の再実験を計算中…';let count={both:0,redOnly:0,blueOnly:0,none:0};let sg=0,sr=0,sb=0;
+ const btn=$('batch'),wasPlaying=playing;playing=false;btn.disabled=true;$('batchResult').textContent='10回の再実験を計算中…';let count={both:0,greenOnly:0,redOnly:0,none:0};let sg=0,sr=0;
  const pref=options();for(let i=0;i<10;i++){
-  const tmp=new Lab({...pref,seed:pref.seed+i});tmp.run(100,.08);const n=tmp.counts();sg+=n.g;sr+=n.r;sb+=n.b;
-  if(n.r&&n.b)count.both++;else if(n.r)count.redOnly++;else if(n.b)count.blueOnly++;else count.none++;
+  const tmp=new Lab({...pref,seed:pref.seed+i});tmp.run(100,.08);const n=tmp.counts();sg+=n.g;sr+=n.r;
+  if(n.g&&n.r)count.both++;else if(n.g)count.greenOnly++;else if(n.r)count.redOnly++;else count.none++;
   $('batchResult').textContent=`${i+1}/10 完了`;await new Promise(resolve=>setTimeout(resolve,0));
  }
- $('batchResult').textContent=`10回検証｜共存 ${count.both}回・赤のみ ${count.redOnly}回・青のみ ${count.blueOnly}回・共倒れ ${count.none}回｜平均最終数 緑${Math.round(sg/10)} 赤${(sr/10).toFixed(1)} 青${(sb/10).toFixed(1)}`;
+ $('batchResult').textContent=`10回検証｜緑赤共存 ${count.both}回・緑のみ ${count.greenOnly}回・赤のみ ${count.redOnly}回・両種絶滅 ${count.none}回｜平均最終数 緑${Math.round(sg/10)} 赤${(sr/10).toFixed(1)}`;
  btn.disabled=false;playing=wasPlaying&&!ended;
 };
 reset();requestAnimationFrame(frame);
