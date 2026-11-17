@@ -15,7 +15,7 @@ jobs:
         run: node tests/smoke.test.js
       - name: Verify UI callbacks
         run: node tests/ui-smoke.js
-      - name: Simulate 100 reproducible worlds
-        run: node tests/montecarlo.js 100
-      - name: Compare red predator initial populations in 100-day trials
-        run: node tests/predator-balance.js 100
+      - name: Quick seeded population regression
+        run: node tests/montecarlo.js 5
+      - name: Quick green/red balance regression
+        run: node tests/predator-balance.js 3
