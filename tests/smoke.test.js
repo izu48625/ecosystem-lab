@@ -114,5 +114,18 @@ function testNeuroevolution(){
  assert.deepEqual(ai.summary(),replay.summary(),'Neuroevolution must be reproducible at same seed and step');
  console.log('✓ AI①の神経回路・遺伝・変異・世代交代・赤の固定行動を検証');
 }
+function testUnchangedRedRules(){
+ const input={seed:424242,green:0,red:10,blue:0,variance:10,regrowth:100,duration:40};
+ const n=new Lab({...input,mode:'normal'});
+ const a=new Lab({...input,mode:'escape'});
+ // No green = neural escape system never runs. Red dynamics must be identical.
+ n.run(40,.08);a.run(40,.08);
+ assert.deepEqual(a.counts(),n.counts(),'Red population must be unchanged when green behavior is absent');
+ assert.deepEqual(a.stats.births.r,n.stats.births.r,'Red births share exactly the same rule');
+ assert.deepEqual(a.stats.deaths.r,n.stats.deaths.r,'Red death rules share the same implementation');
+ assert.deepEqual(a.history.map(x=>x.r),n.history.map(x=>x.r),'Red trajectory must match step-by-step');
+ console.log('✓ 赤の出生・死亡・移動のルールはノーマルとAI①で完全一致');
+}
 testLastChanceMeal();testWalls();
 testNeuroevolution();
+testUnchangedRedRules();
