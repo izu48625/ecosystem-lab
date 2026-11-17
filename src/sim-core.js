@@ -1,5 +1,5 @@
 /* Ecosystem Lab — deterministic, browser-and-Node compatible simulation engine.
- * All times are fictional in-game days. No actual machine learning is used.
+ * All times are fictional in-game days. Optional escape mode uses local neuroevolution.
  */
 (function (host, factory) {
   const API = factory();
@@ -14,6 +14,31 @@
     b: { name:'肉食B・青', hp:100, attack:35, speed:1.35, life:45, mature:7, reproduction:13, drain:23, view:1.1, birthRate:0.18, birthEnergy:76, birthCost:32, hunting:true, foodGain:91, attackCooldown:0.18, color:'#7baaff' }
   });
   function clamp(a,min,max){return Math.max(min,Math.min(max,a))}
+  // Each green herbivore carries an independently inherited neural genome.
+  // 10 sensory inputs -> 8 hidden units -> 3 action parameters (115 weights).
+  const BRAIN_INPUTS=10,BRAIN_HIDDEN=8,BRAIN_OUTPUTS=3;
+  const BRAIN_SIZE=(BRAIN_INPUTS+1)*BRAIN_HIDDEN+(BRAIN_HIDDEN+1)*BRAIN_OUTPUTS;
+  function initialBrain(seed,id){
+    let state=(seed^Math.imul(id,0x9e3779b1))>>>0;
+    const rand=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296};
+    return Array.from({length:BRAIN_SIZE},()=> (rand()*2-1)*.38);
+  }
+  function neuralForward(weights,input){
+    let offset=0;
+    const hidden=new Array(BRAIN_HIDDEN);
+    for(let i=0;i<BRAIN_HIDDEN;i++){
+      let v=weights[offset+BRAIN_INPUTS];
+      for(let j=0;j<BRAIN_INPUTS;j++)v+=weights[offset+j]*input[j];
+      hidden[i]=Math.tanh(v);offset+=BRAIN_INPUTS+1;
+    }
+    const outputs=[];
+    for(let i=0;i<BRAIN_OUTPUTS;i++){
+      let v=weights[offset+BRAIN_HIDDEN];
+      for(let j=0;j<BRAIN_HIDDEN;j++)v+=weights[offset+j]*hidden[j];
+      outputs.push(Math.tanh(v));offset+=BRAIN_HIDDEN+1;
+    }
+    return outputs; // avoidance angle, lateral motion, danger threshold adaptation
+  }
   class Lab {
     constructor(settings={}) { this.reset(settings); }
     reset(settings={}){
@@ -24,6 +49,7 @@
         blue:clamp(Number(settings.blue??10),0,60),
         variance:clamp(Number(settings.variance??10),0,25)/100,
         regrowth:clamp(Number(settings.regrowth??100),20,250)/100,
+        mode:settings.mode==='escape'?'escape':'normal',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
         duration:settings.duration===Infinity?Infinity:clamp(Number(settings.duration??100),1,5000000)
       };
@@ -32,25 +58,51 @@
       this.history=[];this.events=[];this.effects=[];
       this.stats={births:{g:0,r:0,b:0},deaths:{g:{hunt:0,starve:0,age:0,defense:0},r:{hunt:0,starve:0,age:0,defense:0},b:{hunt:0,starve:0,age:0,defense:0}},kills:{r:0,b:0},hunts:{r:0,b:0},strikes:{r:0,b:0},counters:0,
         // Exposure is the total time spent alive by all members of each species.
-        individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0}};
+        individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0},ai:{founders:0,offspring:0,mutatedOffspring:0,mutatedGenes:0,highestGeneration:0,threatDays:0,fleeDays:0,riskDays:0}};
       for(const [k,count] of [['g',this.settings.green],['r',this.settings.red],['b',this.settings.blue]]) for(let i=0;i<count;i++) this.spawn(k,this.rand(24,W-24),this.rand(24,H-24),true);
-      this.record('start','緑・赤・青の生物を同時投入');this.snapshot(0);
+      this.record('start',this.settings.mode==='escape'?'AI①：緑の逃走判断を遺伝・突然変異させる実験を開始':'緑・赤の生物を投入');this.snapshot(0);
       return this;
     }
     rnd(){this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;return this.seed/4294967296}
     rand(a,b){return a+(b-a)*this.rnd()}
     record(kind,text){this.events.unshift({day:Number(this.day.toFixed(1)),kind,text});if(this.events.length>50)this.events.pop()}
-    spawn(type,x,y,initial=false){
+    mutateBrain(parent){
+      let changed=0;
+      const child=parent.genome.map(w=>{
+        if(this.rnd()<.08){changed++;return clamp(w+(this.rnd()*2-1)*.34,-3,3)}
+        return w;
+      });
+      this.stats.ai.offspring++;
+      if(changed)this.stats.ai.mutatedOffspring++;
+      this.stats.ai.mutatedGenes+=changed;
+      return child;
+    }
+    spawn(type,x,y,initial=false,parent=null){
       const t=SPECIES[type], variation=()=>1+this.rand(-this.settings.variance,this.settings.variance);
       const temperament= type==='g'?(this.rnd()<.25?'timid':this.rnd()<.333?'brave':'normal'):(this.rnd()<.5?'bold':'careful');
       const age=initial?(type==='g'?this.rand(0,4):this.rand(3,9)):0;
       const e={id:++this.nextId,type,x:clamp(x,9,W-9),y:clamp(y,9,H-9),angle:this.rand(-Math.PI,Math.PI),maxhp:t.hp*variation(),attack:t.attack*variation(),speed:t.speed*variation(),life:t.life*variation(),view:t.view*variation(),energy:initial?this.rand(75,98):this.rand(80,95),age,lastBirth:this.day-(initial?this.rand(0,t.reproduction):0),lastAttack:-2,lastCounter:-2,turnAt:0,children:0,kills:0,counters:0,temperament,targetId:null,phase:this.rand(0,6),alive:true,flash:0};
-      e.hp=e.maxhp;this.entities.push(e);return e;
+      e.hp=e.maxhp;
+      if(type==='g'&&this.settings.mode==='escape'){
+        e.genome=parent?this.mutateBrain(parent):initialBrain(this.settings.seed,e.id);
+        e.generation=parent?parent.generation+1:0;
+        e.parentId=parent?parent.id:null;
+        if(!parent)this.stats.ai.founders++;
+        this.stats.ai.highestGeneration=Math.max(this.stats.ai.highestGeneration,e.generation);
+      }
+      this.entities.push(e);return e;
     }
     counts(){const out={g:0,r:0,b:0};for(const a of this.entities)if(a.alive)out[a.type]++;return out}
     grassTotal(){return this.grass.reduce((sum,v)=>sum+v,0)/this.grass.length}
     gridIndex(x,y){return clamp(Math.floor(y/CELL),0,GRID_Y-1)*GRID_X+clamp(Math.floor(x/CELL),0,GRID_X-1)}
-    snapshot(d){const n=this.counts();this.history.push({day:d,...n,grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters,
+    snapshot(d){const n=this.counts();
+      const ai=this.stats.ai,aliveGreen=this.entities.filter(e=>e.alive&&e.type==='g');
+      const meanGeneration=this.settings.mode==='escape'&&aliveGreen.length?
+        aliveGreen.reduce((sum,e)=>sum+e.generation,0)/aliveGreen.length:0;
+      const reference=[-.45,.15,1,0,.65,.65,.9,0,0,.8];
+      const meanDangerSignal=this.settings.mode==='escape'&&aliveGreen.length?
+        aliveGreen.reduce((sum,e)=>sum+neuralForward(e.genome,reference)[2],0)/aliveGreen.length:0;
+      this.history.push({day:d,...n,aiMeanGeneration:Number(meanGeneration.toFixed(3)),aiEscapeBias:Number(meanDangerSignal.toFixed(3)),aiOffspring:ai.offspring,aiMutated:ai.mutatedOffspring,aiFleeDays:Number(ai.fleeDays.toFixed(2)),grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters,
         daysr:this.stats.individualDays.r,daysb:this.stats.individualDays.b,edger:this.stats.edgeDays.r,edgeb:this.stats.edgeDays.b,starvegrassg:this.stats.starveWithGlobalGrass.g})}
     particle(x,y,color,n=6){for(let i=0;i<n;i++)this.effects.push({x,y,vx:this.rand(-45,45),vy:this.rand(-45,45),life:this.rand(.25,.65),color})}
     die(a,reason,killer=null){
@@ -129,11 +181,42 @@
           // When severely hungry, a herbivore takes a controlled risk to
           // graze unless the predator is already close. This prevents endless
           // long-range fleeing while accessible plants remain nearby.
-          const dangerRange=(e.energy<28?48:85)*e.view;
-          const danger=this.nearest(e,index,dangerRange,'r');const dangerB=this.nearest(e,index,dangerRange,'b');
+          const escapeAI=this.settings.mode==='escape';
+          const dangerRange=(escapeAI?180:(e.energy<28?48:85))*e.view;
+          const danger=this.nearest(e,index,dangerRange,'r');
+          const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
-          if(threat){const dx=e.x-threat.x,dy=e.y-threat.y;this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');}
-          else{
+          let fleeing=false;
+          if(threat&&escapeAI){
+            const distance=Math.max(.01,Math.hypot(e.x-threat.x,e.y-threat.y));
+            const proximity=clamp(1-distance/(180*e.view),0,1);
+            const inputs=[
+              clamp((threat.x-e.x)/180,-1,1),clamp((threat.y-e.y)/180,-1,1),
+              Math.cos(threat.angle),Math.sin(threat.angle),proximity,e.energy/100,
+              clamp(e.hp/e.maxhp,0,1),clamp((e.x-W/2)/(W/2),-1,1),
+              clamp((e.y-H/2)/(H/2),-1,1),this.grass[this.gridIndex(e.x,e.y)]
+            ];
+            const [turn,offset,urge]=neuralForward(e.genome,inputs);
+            const hunger=(100-e.energy)/100;
+            // The standard escape reflex provides a survivable founding policy.
+            // The network evolves when to flee and which route/lateral dodge to take.
+            const alarm=proximity+urge*.33,threshold=.39+hunger*.25;
+            this.stats.ai.threatDays+=dt;
+            if(alarm>threshold){
+              const dx=e.x-threat.x,dy=e.y-threat.y;
+              const rotation=turn*1.05,cos=Math.cos(rotation),sin=Math.sin(rotation);
+              const vx=dx*cos-dy*sin-dy*offset*.55;
+              const vy=dx*sin+dy*cos+dx*offset*.55;
+              this.move(e,vx,vy,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');
+              this.stats.ai.fleeDays+=dt;
+              fleeing=true;
+            }else this.stats.ai.riskDays+=dt;
+          }else if(threat){
+            const dx=e.x-threat.x,dy=e.y-threat.y;
+            this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');
+            fleeing=true;
+          }
+          if(!fleeing){
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
             for(const [vx,vy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=clamp(cx+vx,0,GRID_X-1),ny=clamp(cy+vy,0,GRID_Y-1),n=this.grass[ny*GRID_X+nx];if(n>food+.18){food=n;tx=(nx+.5)*CELL;ty=(ny+.5)*CELL}}
@@ -180,12 +263,12 @@
         const fertility=e.type==='g'?clamp((foodAvailability-.05)/.38,.05,1):1;
         if(canBirth && this.rnd()<dt*t.birthRate*fertility && this.entities.length+newborn.length<MAX_POP){
           e.energy-=t.birthCost;e.lastBirth=this.day;e.children++;
-          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10)});this.stats.births[e.type]++;
+          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),parent:this.settings.mode==='escape'&&e.type==='g'?e:null});this.stats.births[e.type]++;
           if(e.type!=='g'&&this.stats.births[e.type]===1)this.record('birth', (e.type==='r'?'赤':'青')+'の捕食者が初めて繁殖');
         }
         e.phase+=dt*10;e.flash=Math.max(0,e.flash-dt);
       }
-      for(const item of newborn)this.spawn(item.type,item.x,item.y);
+      for(const item of newborn)this.spawn(item.type,item.x,item.y,false,item.parent);
       this.entities=this.entities.filter(e=>e.alive);
       for(const p of this.effects){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}
       this.effects=this.effects.filter(p=>p.life>0);
@@ -196,5 +279,5 @@
     run(days=Number.isFinite(this.settings.duration)?this.settings.duration:this.day+100,step=.08){if(!Number.isFinite(days))throw new RangeError('Run target day must be finite');let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
     summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history}}
   }
-  return {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL};
+  return {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL,BRAIN_SIZE,neuralForward};
 });
