@@ -5,7 +5,7 @@ const $=id=>document.getElementById(id), {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL}=wi
 const cv=$('world'),c=cv.getContext('2d'),pop=$('chart'),popCtx=pop.getContext('2d'),pred=$('predChart'),predCtx=pred.getContext('2d');
 let lab,playing=true,ended=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0;
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:Number($('startb').value),variance:Number($('variance').value),regrowth:Number($('regrowth').value),aiEnabled:Boolean($('aiEnabled').checked),aiStartDay:30}}
+function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:Number($('startb').value),variance:Number($('variance').value),regrowth:Number($('regrowth').value)}}
 function reset(){lab=new Lab(options());playing=true;ended=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};show();draw();drawCharts()}
 function creature(e){
  c.save();c.translate(e.x,e.y);c.rotate(e.angle);const sz=e.type==='g'?.88:e.type==='r'?1.08:1.22;c.scale(sz,sz);
@@ -64,11 +64,6 @@ function show(){
  $('effB').textContent=s.individualDays.b?(s.kills.b/s.individualDays.b*100).toFixed(1):'—';
  for(const [t,id] of [['g','edgeG'],['r','edgeR'],['b','edgeB']])$(id).textContent=s.individualDays[t]?(100*s.edgeDays[t]/s.individualDays[t]).toFixed(1)+'%':'—';
  $('nearStarveG').textContent=s.starveWithLocalGrass.g;
- $('learningStatus').textContent=!lab.settings.aiEnabled?'学習なし':lab.learning.active?'● 学習中':'DAY30まで通常行動';
- $('learnDay').textContent=!lab.settings.aiEnabled?'OFF':lab.learning.active?'DAY '+lab.day.toFixed(0):'待機';
- for(const [t,id,actionId] of [['g','learnG','learnActionsG'],['r','learnR','learnActionsR'],['b','learnB','learnActionsB']]){
-   $(id).textContent=lab.learning.updates[t];$(actionId).textContent=lab.learning.decisions[t].join(' / ');
- }
  const e=lab.events[0];$('event').textContent=e?`DAY ${Math.floor(e.day)} — ${e.text}`:'';
  const sel=lab.entities.find(e=>e.id===focus);
  $('selected').textContent=sel?`#${sel.id}｜${SPECIES[sel.type].name}\nHP ${Math.ceil(sel.hp)}/${Math.ceil(sel.maxhp)}｜エネルギー ${Math.ceil(sel.energy)}%｜年齢 ${sel.age.toFixed(1)}/${sel.life.toFixed(1)}日｜攻撃力 ${sel.attack.toFixed(1)}｜移動 ${sel.speed.toFixed(2)}｜捕食 ${sel.kills}｜子 ${sel.children}｜反撃 ${sel.counters}`:'生物をタップすると、HP・年齢・エネルギー・個体記録を表示します。';
@@ -82,7 +77,7 @@ function frame(t){
  draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}requestAnimationFrame(frame)
 }
 function exportCSV(){
- const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg','aiActive','learnG','learnR','learnB'];
+ const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg'];
  const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]).join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ecosystem_seed_${lab.settings.seed}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
@@ -95,22 +90,6 @@ $('variance').oninput=()=>{$('varText').textContent='±'+$('variance').value+'%'
 document.querySelectorAll('#speeds button').forEach(btn=>btn.onclick=()=>{speed=Number(btn.dataset.s);document.querySelectorAll('#speeds button').forEach(b=>b.classList.toggle('active',b===btn))});
 cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect(),sx=(e.clientX-r.left)/r.width*W,sy=(e.clientY-r.top)/r.height*H,x=(sx-W/2)/zoom+cam.x,y=(sy-H/2)/zoom+cam.y;let best=null,bestD=25/zoom;
 for(const a of lab.entities){const d=Math.hypot(a.x-x,a.y-y);if(d<bestD){bestD=d;best=a}}if(best){focus=best.id;zoom=Math.max(zoom,1.7);cam.x=best.x;cam.y=best.y}else{focus=null;if(zoom>1){cam.x=x;cam.y=y}}show()});
-$('compare').onclick=async()=>{
- const btn=$('compare');if(btn.disabled)return;
- const wasPlaying=playing;playing=false;btn.disabled=true;
- $('compareResult').textContent='同じ乱数シードで、学習あり／なしの100日間を計算中…';
- await new Promise(resolve=>setTimeout(resolve,0));
- try{
-   const pref=options(),baseline=new Lab({...pref,aiEnabled:false}),learned=new Lab({...pref,aiEnabled:true,aiStartDay:30});
-   baseline.run(30,.08);learned.run(30,.08);
-   const sameAt30=JSON.stringify(baseline.history)===JSON.stringify(learned.history);
-   baseline.run(100,.08);learned.run(100,.08);
-   const a=baseline.counts(),b=learned.counts(),u=learned.learning.updates;
-   const f=n=>`緑${n.g} / 赤${n.r} / 青${n.b}`;
-   $('compareResult').textContent=`30日目の開始条件：${sameAt30?'一致':'不一致'}。AIなし：${f(a)}。AIあり：${f(b)}。学習更新：緑${u.g} / 赤${u.r} / 青${u.b}。※違いは必ずしも改善を意味しません。`;
- }catch(e){$('compareResult').textContent='比較中にエラーが発生：'+e.message;}
- btn.disabled=false;playing=wasPlaying&&!ended;
-};
 $('batch').onclick=async()=>{
  if($('batch').disabled)return;
  const btn=$('batch'),wasPlaying=playing;playing=false;btn.disabled=true;$('batchResult').textContent='10回の再実験を計算中…';let count={both:0,redOnly:0,blueOnly:0,none:0};let sg=0,sr=0,sb=0;

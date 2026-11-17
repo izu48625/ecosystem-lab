@@ -1,5 +1,5 @@
 /* Ecosystem Lab — deterministic, browser-and-Node compatible simulation engine.
- * All times are fictional in-game days. Optional shared tabular Q-learning starts at DAY30.
+ * All times are fictional in-game days. No actual machine learning is used.
  */
 (function (host, factory) {
   const API = factory();
@@ -24,14 +24,11 @@
         blue:clamp(Number(settings.blue??10),0,60),
         variance:clamp(Number(settings.variance??10),0,25)/100,
         regrowth:clamp(Number(settings.regrowth??100),20,250)/100,
-        duration:clamp(Number(settings.duration??100),1,500),
-        aiEnabled:Boolean(settings.aiEnabled??false),
-        aiStartDay:clamp(Number(settings.aiStartDay??30),0,500)
+        duration:clamp(Number(settings.duration??100),1,500)
       };
       this.seed=this.settings.seed||1;this.day=0;this.nextId=0;this.entities=[];
       this.grass=Array.from({length:GRID_X*GRID_Y},()=>this.rand(.5,1));
       this.history=[];this.events=[];this.effects=[];
-      this.learning={active:false,q:{g:{},r:{},b:{}},updates:{g:0,r:0,b:0},decisions:{g:[0,0,0],r:[0,0,0],b:[0,0,0]},episodes:{g:0,r:0,b:0}};
       this.stats={births:{g:0,r:0,b:0},deaths:{g:{hunt:0,starve:0,age:0,defense:0},r:{hunt:0,starve:0,age:0,defense:0},b:{hunt:0,starve:0,age:0,defense:0}},kills:{r:0,b:0},hunts:{r:0,b:0},strikes:{r:0,b:0},counters:0,
         // Exposure is the total time spent alive by all members of each species.
         individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0}};
@@ -46,18 +43,17 @@
       const t=SPECIES[type], variation=()=>1+this.rand(-this.settings.variance,this.settings.variance);
       const temperament= type==='g'?(this.rnd()<.25?'timid':this.rnd()<.333?'brave':'normal'):(this.rnd()<.5?'bold':'careful');
       const age=initial?(type==='g'?this.rand(0,4):this.rand(3,9)):0;
-      const e={id:++this.nextId,type,x:clamp(x,9,W-9),y:clamp(y,9,H-9),angle:this.rand(-Math.PI,Math.PI),maxhp:t.hp*variation(),attack:t.attack*variation(),speed:t.speed*variation(),life:t.life*variation(),view:t.view*variation(),energy:initial?this.rand(75,98):this.rand(80,95),age,lastBirth:this.day-(initial?this.rand(0,t.reproduction):0),lastAttack:-2,lastCounter:-2,turnAt:0,children:0,kills:0,counters:0,temperament,targetId:null,phase:this.rand(0,6),alive:true,flash:0,ai:null};
+      const e={id:++this.nextId,type,x:clamp(x,9,W-9),y:clamp(y,9,H-9),angle:this.rand(-Math.PI,Math.PI),maxhp:t.hp*variation(),attack:t.attack*variation(),speed:t.speed*variation(),life:t.life*variation(),view:t.view*variation(),energy:initial?this.rand(75,98):this.rand(80,95),age,lastBirth:this.day-(initial?this.rand(0,t.reproduction):0),lastAttack:-2,lastCounter:-2,turnAt:0,children:0,kills:0,counters:0,temperament,targetId:null,phase:this.rand(0,6),alive:true,flash:0};
       e.hp=e.maxhp;this.entities.push(e);return e;
     }
     counts(){const out={g:0,r:0,b:0};for(const a of this.entities)if(a.alive)out[a.type]++;return out}
     grassTotal(){return this.grass.reduce((sum,v)=>sum+v,0)/this.grass.length}
     gridIndex(x,y){return clamp(Math.floor(y/CELL),0,GRID_Y-1)*GRID_X+clamp(Math.floor(x/CELL),0,GRID_X-1)}
     snapshot(d){const n=this.counts();this.history.push({day:d,...n,grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters,
-        daysr:this.stats.individualDays.r,daysb:this.stats.individualDays.b,edger:this.stats.edgeDays.r,edgeb:this.stats.edgeDays.b,starvegrassg:this.stats.starveWithGlobalGrass.g,aiActive:this.learning.active?1:0,learnG:this.learning.updates.g,learnR:this.learning.updates.r,learnB:this.learning.updates.b})}
+        daysr:this.stats.individualDays.r,daysb:this.stats.individualDays.b,edger:this.stats.edgeDays.r,edgeb:this.stats.edgeDays.b,starvegrassg:this.stats.starveWithGlobalGrass.g})}
     particle(x,y,color,n=6){for(let i=0;i<n;i++)this.effects.push({x,y,vx:this.rand(-45,45),vy:this.rand(-45,45),life:this.rand(.25,.65),color})}
     die(a,reason,killer=null){
       if(!a.alive)return;
-      if(this.learning.active&&a.ai)this.learnFromExperience(a,true);
       a.alive=false;this.stats.deaths[a.type][reason]++;
       if(reason==='starve'){
         // Global grass alone cannot indicate whether an individual could reach food.
@@ -71,42 +67,6 @@
         if(this.stats.kills[killer.type]===1)this.record('hunt',(killer.type==='r'?'赤':'青')+'が初めて捕食に成功');
       }else{this.particle(a.x,a.y,reason==='starve'?'#f5b67a':'#f2adbf',4)}
       if(a.type!=='g' && reason==='starve' && this.stats.deaths[a.type].starve===1)this.record('starve',(a.type==='r'?'赤':'青')+'の個体が餓死');
-    }
-
-    aiState(e){
-      const energy=e.energy<35?'L':e.energy<70?'M':'H';
-      if(e.type==='g')return energy+(this.grass[this.gridIndex(e.x,e.y)]>.28?'F':'D');
-      return energy+(e.targetId?'T':'N');
-    }
-    // Q(s,a) <- Q(s,a) + alpha * (reward + gamma*max Q(s',a') - Q(s,a)).
-    learnFromExperience(e,terminal=false,nextState=this.aiState(e)){
-      const data=e.ai;if(!data)return;
-      const q=this.learning.q[e.type],values=q[data.state]||(q[data.state]=[0,0,0]);
-      const next=q[nextState]||(q[nextState]=[0,0,0]);
-      const deltaEnergy=e.energy-data.energy,deltaHp=e.hp-data.hp;
-      const gainedKills=e.kills-data.kills,gainedChildren=e.children-data.children;
-      let reward=.018*deltaEnergy+.028*deltaHp+1.5*gainedKills+.3*gainedChildren+.03;
-      if(terminal)reward-=2.5;
-      values[data.action]+=.13*(reward+(terminal?0:.74*Math.max(...next))-values[data.action]);
-      this.learning.updates[e.type]++;if(terminal)this.learning.episodes[e.type]++;
-    }
-    chooseLearnedAction(e){
-      if(!this.learning.active)return;
-      const state=this.aiState(e);
-      if(e.ai&&this.day<e.ai.nextDecision)return;
-      if(e.ai)this.learnFromExperience(e,false,state);
-      const q=this.learning.q[e.type],v=q[state]||(q[state]=[0,0,0]);
-      const elapsed=Math.max(0,this.day-this.settings.aiStartDay);
-      const exploration=clamp(.22-.0023*elapsed,.06,.22);
-      let action=0;
-      if(this.rnd()<exploration)action=Math.floor(this.rnd()*3);
-      else{
-        const best=Math.max(...v),options=[];
-        for(let i=0;i<3;i++)if(v[i]>=best-1e-9)options.push(i);
-        action=options[Math.floor(this.rnd()*options.length)];
-      }
-      this.learning.decisions[e.type][action]++;
-      e.ai={state,action,nextDecision:this.day+.48,energy:e.energy,hp:e.hp,kills:e.kills,children:e.children};
     }
     move(a,dx,dy,dt,velocity,stop=0,mode='direct'){
       const d=Math.hypot(dx,dy);if(d<1e-8)return;
@@ -146,15 +106,9 @@
       return best;
     }
     update(dt=.05){
-      if(this.day>=this.settings.duration)return;
-      if(this.settings.aiEnabled&&!this.learning.active&&this.day>=this.settings.aiStartDay){
-        this.learning.active=true;this.record('learn','AI学習が解禁。3種が行動方針を経験から学び始めます');
-      }
-      dt=Math.min(dt,this.settings.duration-this.day);
+      if(this.day>=this.settings.duration)return;      dt=Math.min(dt,this.settings.duration-this.day);
       if(dt<=0)return;
-      const oldDay=Math.floor(this.day);
-      // Quantized time ensures a DAY30 split matches continuous execution.
-      this.day=Number((this.day+dt).toFixed(6));
+      const oldDay=Math.floor(this.day);this.day+=dt;
       if(this.settings.duration-this.day<1e-8)this.day=this.settings.duration;
       for(let i=0;i<this.grass.length;i++)this.grass[i]=Math.min(1,this.grass[i]+dt*.18*this.settings.regrowth*(.8+.4*((i*17)%13)/12));
       const index=this.buildIndex(), newborn=[];
@@ -168,18 +122,16 @@
         this.stats.individualDays[e.type]+=dt;
         e.age+=dt;e.energy-=dt*t.drain*(e.age<t.mature?.46:1);
         if(e.age>=e.life){this.die(e,'age');continue}
-        if(this.learning.active)this.chooseLearnedAction(e);
         // Hunger is checked *after* a foraging/hunting opportunity this tick.
         // Otherwise an animal may die just before eating food already underfoot.
         if(e.type==='g'){
           // When severely hungry, a herbivore takes a controlled risk to
           // graze unless the predator is already close. This prevents endless
           // long-range fleeing while accessible plants remain nearby.
-          const escapeStrategy=e.ai?e.ai.action:1;
-          const dangerRange=(e.energy<28?48:85)*e.view*(e.ai?[1.15,1,.85][escapeStrategy]:1);
+          const dangerRange=(e.energy<28?48:85)*e.view;
           const danger=this.nearest(e,index,dangerRange,'r');const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
-          if(threat){const dx=e.x-threat.x,dy=e.y-threat.y;this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1)*(e.ai?[1.04,1,.98][escapeStrategy]:1),0,'flee');}
+          if(threat){const dx=e.x-threat.x,dy=e.y-threat.y;this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');}
           else{
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
@@ -191,10 +143,7 @@
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
           if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
         }else{
-          const strategy=e.ai?e.ai.action:1;
-          const thresholds=e.type==='r'?[50,55,64]:[57,64,73];
-          const needsFood=e.energy<thresholds[strategy];
-          if(e.ai&&strategy===2)e.energy-=dt*2;
+          const needsFood=e.energy<(e.type==='r'?55:64);
           let target=null;
           if(needsFood){
             if(e.targetId)target=this.entities.find(a=>a.id===e.targetId&&a.alive&&a.type==='g');
@@ -241,13 +190,10 @@
       this.effects=this.effects.filter(p=>p.life>0);
       const today=Math.floor(this.day);
       if(today>oldDay){for(let d=oldDay+1;d<=today;d++){this.snapshot(d);if(d%20===0){const n=this.counts();this.record('milestone',`緑${n.g}匹、赤${n.r}匹、青${n.b}匹が生存`)}}}
-      if(this.day>=this.settings.duration){
-        if(this.learning.active){for(const e of this.entities)if(e.ai){this.learnFromExperience(e,false);e.ai=null}}
-        this.record('end',`${this.settings.duration}日間の実験終了`);
-      }
+      if(this.day>=this.settings.duration)this.record('end',`${this.settings.duration}日間の実験終了`);
     }
-    run(days=this.settings.duration,step=.08){let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,Number((to-this.day).toFixed(6))));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
-    summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history,learning:this.learning}}
+    run(days=this.settings.duration,step=.08){let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
+    summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history}}
   }
   return {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL};
 });
