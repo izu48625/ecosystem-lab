@@ -36,4 +36,4 @@ jobs:
         with:
           node-version: '22'
       - name: Compare AI1 escape by generation for 25 seeds
-        run: node tests/escape-telemetry-study.js ${{ matrix.offset }} 25
+        run: node tests/escape-telemetry-study.js ${{ matrix.offset }} 25 clone
