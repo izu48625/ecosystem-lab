@@ -1,0 +1,24 @@
+name: Paired AI1 comparison UI validation
+on:
+  push:
+    branches:
+      - feature/paired-normal-ai1-survival-20261119
+    paths:
+      - '.github/workflows/paired-ui-test.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Simulation deterministic and genetics smoke
+        run: node tests/smoke.test.js
+      - name: Browser callbacks and screenshot regression
+        run: node tests/ui-smoke.js
+      - name: Small same-seed Normal vs AI1 repeatability
+        run: node tests/escape-comparison.js 4
