@@ -92,7 +92,7 @@
     }
     aiLog(event){
       const ai=this.stats.ai;
-      if(ai.escapeEvents.length<3000)ai.escapeEvents.push(event);
+      if(ai.escapeEvents.length<20000)ai.escapeEvents.push(event);
       else ai.eventsDropped++;
     }
     aiFleeStarted(green,red,distance,priorHeading,x,y){
