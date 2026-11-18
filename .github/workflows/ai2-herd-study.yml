@@ -1,0 +1,52 @@
+name: AI2 herd evolution 100-world paired ecology study
+on:
+  push:
+    branches:
+      - feature/ai2-herd-evolution-20261119
+    paths:
+      - '.github/workflows/ai2-herd-study.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "seed-${{ matrix.offset }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        offset: [0,10,20,30,40,50,60,70,80,90]
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run Normal AI1 AI2 and three genetic/social ablation controls
+        run: node tests/ai2-herd-study.js ${{ matrix.offset }} 10 20400001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-shard-${{ matrix.offset }}
+          path: reports/ai2-herd-raw/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ai2-shard-*
+          path: reports/ai2-herd-raw/
+          merge-multiple: true
+      - name: Check grouping, predation, starvation, species coexistence and genetic inheritance
+        run: node tests/ai2-herd-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-100-world-multi-factor-report
+          path: reports/ai2-herd-study/
+          if-no-files-found: error
