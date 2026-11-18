@@ -19,6 +19,9 @@ const period=day=>bands[Math.min(4,Math.floor(day/20))];
 const zero=()=>({start:0,survived:0,hit:0,diedOther:0});
 function run(seed,mode){
  const lab=new Lab({...settings,seed});
+ // The browser caps downloadable individual logs at 20,000 entries.
+ // Research runs intentionally retain the full events, without truncation.
+ lab.aiLog=function(event){this.stats.ai.escapeEvents.push(event);};
  if(mode==='clone'){
   const mutate=lab.mutateBrain;
   lab.mutateBrain=function(parent){
