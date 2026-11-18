@@ -118,6 +118,7 @@ function render(lab){
    set('rrStartDistance',t.distance==='—'?'—':t.distance+'px');
    set('rrTurnAngle',t.turn==='—'?'—':t.turn+'°');
    set('rrChaseBreak',t.breakRate);
+   set('reportLogInfo','個別イベント記録 '+pretty(lab.stats.ai.escapeEvents.length)+'件'+(t.eventsDropped?'／上限超過 '+pretty(t.eventsDropped)+'件は個別ログ省略':'')+'。日別・世代別の集計は全件。');
    $('reportGenerationRows').innerHTML=t.rows.map(row=>
      '<tr><td>'+row.name+'</td><td>'+pretty(row.fleeStarts)+'</td><td>'+row.distance+
      '</td><td>'+row.turn+'°</td><td>'+row.chaseEscaped+' / '+row.resolved+'</td></tr>'
@@ -211,7 +212,10 @@ function exportPNG(){
    txt('赤のルールはAI①と同一です。',74,1290+infoShift,24,'#91cbae');
  }
  txt('※ 捕食成功率は捕食数／追跡開始数。進化の成功や現実の生態系を保証しません。',52,1418+infoShift,18,'#9bb9a9');
- txt('離脱率は赤の追跡範囲から外れた回数／（離脱＋その赤による捕食）。',52,1452+infoShift,18,'#9bb9a9');
+ txt(d.isAI?'離脱率＝距離離脱／（離脱＋同じ赤による捕食）。途中解除・継続中は除外。':'世代交代によるAI進化はノーマルでは行われません。',52,1452+infoShift,18,'#9bb9a9');
+ if(d.isAI){
+   txt('個別イベントログ最大20,000件・上限以降は集計のみ（累計は常に全件）。',52,1940,18,'#9bb9a9');
+ }
  cv.toBlob(blob=>{
    if(!blob)return;
    const url=URL.createObjectURL(blob),a=document.createElement('a');
