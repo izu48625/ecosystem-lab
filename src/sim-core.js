@@ -122,19 +122,26 @@
     aiChaseStart(red,green){
       if(this.settings.mode!=='escape'||red.type!=='r')return;
       if(red.aiChase)this.aiChaseFinish(red,'other');
-      red.aiChase={greenId:green.id,generation:green.generation};
+      red.aiChase={greenId:green.id,generation:green.generation,startDay:this.day};
       this.stats.ai.chaseStarts++;this.aiGeneration(green.generation).chaseStarts++;
+      this.aiLog({
+        day:Number(this.day.toFixed(3)),kind:'chase_start',
+        greenId:green.id,generation:green.generation,redId:red.id,
+        startDistance:Number(Math.hypot(green.x-red.x,green.y-red.y).toFixed(2)),
+        turnDeg:null,awayDeg:null,outcome:null,detail:null,pursuitDays:null
+      });
     }
-    aiChaseFinish(red,outcome){
+    aiChaseFinish(red,outcome,detail=''){
       const ongoing=red.aiChase;
       if(!ongoing)return;
       const ai=this.stats.ai,group=this.aiGeneration(ongoing.generation);
       const field={escaped:'chaseEscaped',caught:'chaseCaught',other:'chaseOther'}[outcome];
       ai[field]++;group[field]++;
-      if(outcome==='escaped'||outcome==='caught')this.aiLog({
+      this.aiLog({
         day:Number(this.day.toFixed(3)),kind:'chase_end',
         greenId:ongoing.greenId,generation:ongoing.generation,redId:red.id,
-        outcome,startDistance:null,turnDeg:null,awayDeg:null
+        outcome,detail,startDistance:null,turnDeg:null,awayDeg:null,
+        pursuitDays:Number((this.day-ongoing.startDay).toFixed(3))
       });
       red.aiChase=null;
     }
@@ -178,7 +185,7 @@
     die(a,reason,killer=null){
       if(!a.alive)return;
       a.alive=false;this.stats.deaths[a.type][reason]++;
-      if(this.settings.mode==='escape'&&a.type==='r')this.aiChaseFinish(a,'other');
+      if(this.settings.mode==='escape'&&a.type==='r')this.aiChaseFinish(a,'other','red_died');
       if(reason==='starve'){
         // Global grass alone cannot indicate whether an individual could reach food.
         if(this.grassTotal()>.5)this.stats.starveWithGlobalGrass[a.type]++;
@@ -307,10 +314,10 @@
           if(needsFood){
             if(e.targetId)target=this.entities.find(a=>a.id===e.targetId&&a.alive&&a.type==='g');
             if(target&&Math.hypot(e.x-target.x,e.y-target.y)>200*e.view){
-              if(this.settings.mode==='escape'&&e.type==='r')this.aiChaseFinish(e,'escaped');
+              if(this.settings.mode==='escape'&&e.type==='r')this.aiChaseFinish(e,'escaped','distance_exceeded');
               target=null;
             }
-            if(!target&&e.aiChase)this.aiChaseFinish(e,'other');
+            if(!target&&e.aiChase)this.aiChaseFinish(e,'other','target_missing');
             if(!target){target=this.nearest(e,index,185*e.view,'g');if(target){e.targetId=target.id;e.hunts=(e.hunts||0)+1;this.stats.hunts[e.type]++;if(e.type==='r')this.aiChaseStart(e,target)}}
           }
           if(target){
@@ -327,10 +334,10 @@
                   if(this.stats.counters===1)this.record('counter','草食生物が初めて反撃');
                 }
               }
-              if(target.hp<=0 && target.alive){if(e.type==='r')this.aiChaseFinish(e,'caught');this.die(target,'hunt',e);e.targetId=null}
+              if(target.hp<=0 && target.alive){if(e.type==='r')this.aiChaseFinish(e,'caught','caught_target');this.die(target,'hunt',e);e.targetId=null}
             }
           }else{
-            if(e.aiChase)this.aiChaseFinish(e,'other');
+            if(e.aiChase)this.aiChaseFinish(e,'other','stopped_hunting');
             e.targetId=null;if(this.day>=e.turnAt){e.turnAt=this.day+this.rand(.16,.55);e.angle+=this.rand(-1.8,1.8)}
             this.move(e,Math.cos(e.angle),Math.sin(e.angle),dt,75*e.speed,0,'wander');
           }
