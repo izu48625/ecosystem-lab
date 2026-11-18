@@ -23,7 +23,7 @@ jobs:
         run: node tests/escape-comparison.js 4
 
   compare_100:
-    name: Paired 100-day study seeds ${{ matrix.offset }}–${{ matrix.offset + 24 }}
+    name: Paired 100-day study offset ${{ matrix.offset }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
