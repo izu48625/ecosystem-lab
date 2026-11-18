@@ -16,7 +16,7 @@ function oneWorld(seed,mode){
  const lab=new Lab({seed,green:100,red:20,blue:0,variance:10,regrowth:100,mode:spec,
   escapePolicy:'wide',socialEnabled:mode!=='socialOff',duration:100});
  lab.aiLog=function(){};
- const founders=lab.entities.filter(e=>e.type==='g').map(e=>e.genome.slice());
+ const founders=spec==='social'?lab.entities.filter(e=>e.type==='g').map(e=>e.genome.slice()):[];
  if(mode==='socialClone'){
   const original=lab.mutateBrain;
   lab.mutateBrain=function(parent){original.call(this,parent);return parent.genome.slice()};
