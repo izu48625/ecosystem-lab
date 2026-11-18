@@ -217,7 +217,7 @@ function exportPNG(){
  txt('何を・どう学習させる？',74,1106+infoShift,30,'#dcffe8','800');
  if(d.isAI){
    txt('入力｜赤の相対位置・方向・近さ／緑のHP・空腹・位置／草',74,1159+infoShift,22,'#b7ded0');
-   txt('判断｜早期警戒・方向のブレを抑えた逃走／神経回路で角度を調整',74,1202+infoShift,22,'#b7ded0');
+   txt(activeLab.settings.escapePolicy==='wide'?'判断｜早期警戒・方向のブレを抑えた逃走／神経回路で角度を調整':'判断｜逃走開始・角度・左右回避を神経回路が調整',74,1202+infoShift,22,'#b7ded0');
    txt('遺伝｜10入力 → 8神経 → 3出力、115重み',74,1245+infoShift,22,'#b7ded0');
    txt(`進化｜出生時に継承、各重み${mutationRate}で±${mutationAmplitude}変異`,74,1288+infoShift,22,'#b7ded0');
    txt('選択｜生存・繁殖（個体内の経験学習はなし）',74,1325+infoShift,19,'#91cbae');
