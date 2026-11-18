@@ -1,0 +1,68 @@
+name: AI2 independent multivariate ecological and spatial audit
+on:
+  push:
+    branches:
+      - research/ai2-independent-ecological-assessment-20261119
+    paths:
+      - '.github/workflows/ai2-independent-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "${{ matrix.scenario }}-${{ matrix.offset }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {scenario: base, offset: 0}
+          - {scenario: base, offset: 10}
+          - {scenario: base, offset: 20}
+          - {scenario: base, offset: 30}
+          - {scenario: red10, offset: 0}
+          - {scenario: red10, offset: 10}
+          - {scenario: red30, offset: 0}
+          - {scenario: red30, offset: 10}
+          - {scenario: grass75, offset: 0}
+          - {scenario: grass75, offset: 10}
+          - {scenario: grass125, offset: 0}
+          - {scenario: grass125, offset: 10}
+          - {scenario: day200, offset: 0}
+          - {scenario: day200, offset: 10}
+          - {scenario: green50, offset: 0}
+          - {scenario: green50, offset: 10}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit actual simulated predator-prey ecology and spatial herds
+        run: node tests/ai2-audit-run.js ${{ matrix.scenario }} ${{ matrix.offset }} 10
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ecological-${{ matrix.scenario }}-${{ matrix.offset }}
+          path: reports/ai2-audit-raw/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ecological-*
+          path: reports/ai2-audit-raw/
+          merge-multiple: true
+      - name: Calculate world-seed paired bootstrap stress and herd alignment metrics
+        run: node tests/ai2-audit-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-audit-spatial-ecological-report
+          path: reports/ai2-audit-final/
+          if-no-files-found: error
