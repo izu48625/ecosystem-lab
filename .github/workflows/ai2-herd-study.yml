@@ -5,6 +5,8 @@ on:
       - feature/ai2-herd-evolution-20261119
     paths:
       - '.github/workflows/ai2-herd-study.yml'
+      - 'tests/ai2-herd-study.js'
+      - 'tests/ai2-herd-aggregate.js'
   workflow_dispatch:
 permissions:
   contents: read
