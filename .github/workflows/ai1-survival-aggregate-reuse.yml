@@ -5,6 +5,7 @@ on:
       - experiment/ai1-survival-balanced-20261119
     paths:
       - '.github/workflows/ai1-survival-aggregate-reuse.yml'
+      - 'tests/ai1-survival-aggregate.js'
   workflow_dispatch:
 permissions:
   contents: read
