@@ -54,6 +54,8 @@
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
+        // Research-only AI1 variants. Defaults exactly to current released AI1.
+        selectionModel:['express','survivor','hybrid','hybridStrong'].includes(settings.selectionModel)?settings.selectionModel:'baseline',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
         duration:settings.duration===Infinity?Infinity:clamp(Number(settings.duration??100),1,5000000)
       };
@@ -78,8 +80,12 @@
     record(kind,text){this.events.unshift({day:Number(this.day.toFixed(1)),kind,text});if(this.events.length>50)this.events.pop()}
     mutateBrain(parent){
       let changed=0;
+      // Strong-variation arm is experimental: wider mutation effects supply selectable genetic differences.
+      const stronger=this.settings.selectionModel==='hybridStrong';
+      const mutChance=stronger?.055:ESCAPE_MUTATION.probability;
+      const mutDelta=stronger?.22:ESCAPE_MUTATION.maxDelta;
       const child=parent.genome.map(w=>{
-        if(this.rnd()<ESCAPE_MUTATION.probability){changed++;return clamp(w+(this.rnd()*2-1)*ESCAPE_MUTATION.maxDelta,-3,3)}
+        if(this.rnd()<mutChance){changed++;return clamp(w+(this.rnd()*2-1)*mutDelta,-3,3)}
         return w;
       });
       this.stats.ai.offspring++;
@@ -140,6 +146,16 @@
     aiChaseFinish(red,outcome,detail=''){
       const ongoing=red.aiChase;
       if(!ongoing)return;
+      // A verified no-hit escape is an observable fitness event, not a learned reward.
+      // The bonus arm makes past chase survivors more likely to have offspring.
+      const selective=['survivor','hybrid','hybridStrong'].includes(this.settings.selectionModel);
+      if(selective&&outcome==='escaped'){
+        const green=this.entities.find(g=>g.id===ongoing.greenId&&g.alive&&g.type==='g');
+        if(green&&(green.lastRedHitDay??-Infinity)<ongoing.startDay){
+          green.successfulEscapes=(green.successfulEscapes||0)+1;
+          green.lastEscapeDay=this.day;
+        }
+      }
       const ai=this.stats.ai,group=this.aiGeneration(ongoing.generation);
       const field={escaped:'chaseEscaped',caught:'chaseCaught',other:'chaseOther'}[outcome];
       ai[field]++;group[field]++;
@@ -197,6 +213,7 @@
     }
     aiEncounterHit(green,red){
       if(this.settings.mode!=='escape'||red.type!=='r'||green.type!=='g')return;
+      if(this.settings.selectionModel!=='baseline')green.lastRedHitDay=this.day;
       // If an attack occurs before this green's update, do not miss the exposure.
       if(!green.aiEncounter && !green.aiThreatNear){
         this.aiEncounterStart(green,red,Math.hypot(green.x-red.x,green.y-red.y));
@@ -346,7 +363,9 @@
             const hunger=(100-e.energy)/100;
             // The standard escape reflex provides a survivable founding policy.
             // The network evolves when to flee and which route/lateral dodge to take.
-            const alarm=proximity+urge*.33;
+            const selectable=this.settings.selectionModel;
+            // Make the heritable neural signal matter more, without altering green's speed or senses.
+            const alarm=proximity+urge*(['express','hybrid','hybridStrong'].includes(selectable)?.82:.33);
             const policy=this.settings.escapePolicy;
             const threshold=policy==='wide'?.25+hunger*.19:
               policy==='early'?.30+hunger*.22:
@@ -354,8 +373,10 @@
             this.stats.ai.threatDays+=dt;
             if(alarm>threshold){
               const dx=e.x-threat.x,dy=e.y-threat.y;
-              const angleScale=policy==='guard'?.65:policy==='wide'?.65:1.05;
-              const lateralScale=policy==='guard'?.30:policy==='wide'?.30:.55;
+              const angleScale=['express','hybrid','hybridStrong'].includes(selectable)?.85:
+                policy==='guard'?.65:policy==='wide'?.65:1.05;
+              const lateralScale=['express','hybrid','hybridStrong'].includes(selectable)?.36:
+                policy==='guard'?.30:policy==='wide'?.30:.55;
               const rotation=turn*angleScale,cos=Math.cos(rotation),sin=Math.sin(rotation);
               const vx=dx*cos-dy*sin-dy*offset*lateralScale;
               const vy=dx*sin+dy*cos+dx*offset*lateralScale;
@@ -423,7 +444,15 @@
         if(e.energy>62 && e.hp<e.maxhp)e.hp=Math.min(e.maxhp,e.hp+dt*t.hp*.045);
         const canBirth=e.age>=t.mature&&this.day-e.lastBirth>=t.reproduction&&e.energy>=t.birthEnergy;
         const fertility=e.type==='g'?clamp((foodAvailability-.05)/.38,.05,1):1;
-        if(canBirth && this.rnd()<dt*t.birthRate*fertility && this.entities.length+newborn.length<MAX_POP){
+        let escapeFitness=1;
+        if(e.type==='g'&&this.settings.mode==='escape'&&
+          ['survivor','hybrid','hybridStrong'].includes(this.settings.selectionModel)){
+          // Explicit selection mechanism: verified no-hit chase survivors reproduce more.
+          // A 10-day memory horizon prevents unlimited permanent reproductive advantage.
+          const recentEscape=(e.successfulEscapes||0)>0&&this.day-e.lastEscapeDay<=10;
+          escapeFitness=recentEscape?(this.settings.selectionModel==='hybridStrong'?2.9:2.2):.85;
+        }
+        if(canBirth && this.rnd()<Math.min(1,dt*t.birthRate*fertility*escapeFitness) && this.entities.length+newborn.length<MAX_POP){
           e.energy-=t.birthCost;e.lastBirth=this.day;e.children++;
           newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),parent:this.settings.mode==='escape'&&e.type==='g'?e:null});this.stats.births[e.type]++;
           if(e.type!=='g'&&this.stats.births[e.type]===1)this.record('birth', (e.type==='r'?'赤':'青')+'の捕食者が初めて繁殖');

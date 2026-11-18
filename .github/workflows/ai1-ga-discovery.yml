@@ -1,0 +1,52 @@
+name: AI1 trained-genome exploratory 20-seed evaluation
+on:
+  push:
+    branches:
+      - research/ai1-selection-pressure-20261119
+    paths:
+      - '.github/workflows/ai1-ga-discovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train:
+    name: "discovery-${{ matrix.offset }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        offset: [0,5,10,15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Train three genetic controls; evaluate unseen chases and ecology
+        run: node tests/ai1-genetic-training.js ${{ matrix.offset }} 5 20370001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: train-discovery-${{ matrix.offset }}
+          path: reports/ga-training/
+          if-no-files-found: error
+  aggregate:
+    needs: train
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: train-discovery-*
+          path: reports/ga-training/
+          merge-multiple: true
+      - name: Bootstrap independent seed outcomes and ecological transfer
+        run: node tests/ai1-genetic-training-aggregate.js 20 5 20370001 discovery
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-genetic-discovery-summary
+          path: reports/ga-training-summary/
+          if-no-files-found: error

@@ -1,0 +1,27 @@
+name: AI1 real-chase artificial selection pilot
+on:
+  push:
+    branches:
+      - research/ai1-selection-pressure-20261119
+    paths:
+      - '.github/workflows/ai1-genetic-pilot.yml'
+      - 'tests/ai1-genetic-training.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Train genomes in real chase arenas, validate on held-out arenas and ecology
+        run: node tests/ai1-genetic-training.js 0 1 20360001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-genetic-pilot-data
+          path: reports/ga-training/
+          if-no-files-found: error

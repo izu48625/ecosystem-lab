@@ -1,0 +1,25 @@
+name: AI1 genetic selection research regression
+on:
+  push:
+    branches:
+      - research/ai1-selection-pressure-20261119
+    paths:
+      - '.github/workflows/ai1-selection-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Existing deterministic biology and mutation invariants
+        run: node tests/smoke.test.js
+      - name: Existing Normal and AI1 presentation + reporting smoke
+        run: node tests/ui-smoke.js
+      - name: Current AI1 survival regression
+        run: node tests/escape-comparison.js 4

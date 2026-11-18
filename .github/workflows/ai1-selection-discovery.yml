@@ -1,0 +1,64 @@
+name: AI1 genetic selection pressure — exploratory common garden
+on:
+  push:
+    branches:
+      - research/ai1-selection-pressure-20261119
+    paths:
+      - '.github/workflows/ai1-selection-discovery.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "${{ matrix.model }}-${{ matrix.offset }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [baseline, express, survivor, hybrid, hybridStrong]
+        offset: [0, 5, 10, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Evaluate evolution mutation-on, mutation-off, no inheritance
+        run: node tests/ai1-selection-study.js ${{ matrix.offset }} 5 20350001 ${{ matrix.model }} 10
+      - uses: actions/upload-artifact@v4
+        with:
+          name: selection-${{ matrix.model }}-${{ matrix.offset }}
+          path: reports/selection-exploration/${{ matrix.model }}/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: selection-*
+          path: reports/selection-exploration/
+          merge-multiple: false
+      - name: Unpack model/seed samples from artifacts
+        shell: bash
+        run: |
+          mkdir -p reports/selection-merged
+          for m in baseline express survivor hybrid hybridStrong; do
+            mkdir -p reports/selection-merged/$m
+            for off in 0 5 10 15; do
+              cp "reports/selection-exploration/selection-$m-$off/shard-$off.json" "reports/selection-merged/$m/shard-$off.json"
+            done
+          done
+          rm -rf reports/selection-exploration
+          mv reports/selection-merged reports/selection-exploration
+      - run: node tests/ai1-selection-discovery.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-selection-discovery-summary
+          path: reports/selection-exploration-summary/
+          if-no-files-found: error

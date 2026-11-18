@@ -1,0 +1,52 @@
+name: AI1 artificial genetic escape training — unseen 100-seed confirmation
+on:
+  push:
+    branches:
+      - research/ai1-selection-pressure-20261119
+    paths:
+      - '.github/workflows/ai1-ga-holdout.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  train:
+    name: "confirmation-${{ matrix.offset }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        offset: [0,10,20,30,40,50,60,70,80,90]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Train genetic/chase controls on 10 new worlds, evaluate heldout arenas and real ecology
+        run: node tests/ai1-genetic-training.js ${{ matrix.offset }} 10 20390001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ga-confirm-${{ matrix.offset }}
+          path: reports/ga-training/
+          if-no-files-found: error
+  aggregate:
+    needs: train
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ga-confirm-*
+          path: reports/ga-training/
+          merge-multiple: true
+      - name: Check predeclared genetic progress and ecological adoption gates
+        run: node tests/ai1-genetic-training-aggregate.js 100 10 20390001 holdout
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-genetic-training-100-seed-final
+          path: reports/ga-training-summary/
+          if-no-files-found: error
