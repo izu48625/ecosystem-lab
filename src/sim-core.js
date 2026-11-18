@@ -54,6 +54,9 @@
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
+        // AI1-only sampling of the grass along an actually travelled route.
+        // Intake per tick remains capped at the unchanged physical grazing limit.
+        foragePath:['startEnd','threePoint'].includes(settings.foragePath)?settings.foragePath:'baseline',
         // Optional AI1-only tactics. 'baseline' leaves the released AI1 unchanged.
         escapeStrategy:['alert','multi','wall','combo','budget','adaptive'].includes(settings.escapeStrategy)?
           settings.escapeStrategy:'baseline',
@@ -326,6 +329,7 @@
         // Hunger is checked *after* a foraging/hunting opportunity this tick.
         // Otherwise an animal may die just before eating food already underfoot.
         if(e.type==='g'){
+          const forageOriginX=e.x,forageOriginY=e.y;
           // When severely hungry, a herbivore takes a controlled risk to
           // graze unless the predator is already close. This prevents endless
           // long-range fleeing while accessible plants remain nearby.
@@ -420,8 +424,20 @@
             const dx=tx!==null?tx-e.x:Math.cos(e.angle),dy=ty!==null?ty-e.y:Math.sin(e.angle);
             this.move(e,dx,dy,dt,55*e.speed,0,'wander');
           }
-          const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
-          if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
+          const gidx=this.gridIndex(e.x,e.y);
+          let biteCell=gidx;
+          if(escapeAI&&this.settings.foragePath!=='baseline'){
+            // A foraging animal may nibble where it actually passed through,
+            // without increasing the total amount eaten within this time-step.
+            const first=this.gridIndex(forageOriginX,forageOriginY);
+            if(this.grass[first]>this.grass[biteCell]+.015)biteCell=first;
+            if(this.settings.foragePath==='threePoint'){
+              const middle=this.gridIndex((e.x+forageOriginX)/2,(e.y+forageOriginY)/2);
+              if(this.grass[middle]>this.grass[biteCell]+.015)biteCell=middle;
+            }
+          }
+          const amount=Math.min(this.grass[biteCell],dt*.48);
+          if(amount>0){this.grass[biteCell]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
         }else{
           const needsFood=e.energy<(e.type==='r'?55:64);
           let target=null;
