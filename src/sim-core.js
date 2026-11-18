@@ -51,6 +51,9 @@
         variance:clamp(Number(settings.variance??10),0,25)/100,
         regrowth:clamp(Number(settings.regrowth??100),20,250)/100,
         mode:settings.mode==='escape'?'escape':'normal',
+        // Research variants are green-only. 'baseline' preserves the currently published AI1.
+        escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
+          settings.escapePolicy:'baseline',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
         duration:settings.duration===Infinity?Infinity:clamp(Number(settings.duration??100),1,5000000)
       };
@@ -343,13 +346,19 @@
             const hunger=(100-e.energy)/100;
             // The standard escape reflex provides a survivable founding policy.
             // The network evolves when to flee and which route/lateral dodge to take.
-            const alarm=proximity+urge*.33,threshold=.39+hunger*.25;
+            const alarm=proximity+urge*.33;
+            const policy=this.settings.escapePolicy;
+            const threshold=policy==='wide'?.25+hunger*.19:
+              policy==='early'?.30+hunger*.22:
+              policy==='guard'?.31+hunger*.22:.39+hunger*.25;
             this.stats.ai.threatDays+=dt;
             if(alarm>threshold){
               const dx=e.x-threat.x,dy=e.y-threat.y;
-              const rotation=turn*1.05,cos=Math.cos(rotation),sin=Math.sin(rotation);
-              const vx=dx*cos-dy*sin-dy*offset*.55;
-              const vy=dx*sin+dy*cos+dx*offset*.55;
+              const angleScale=policy==='guard'?.65:policy==='wide'?.65:1.05;
+              const lateralScale=policy==='guard'?.30:policy==='wide'?.30:.55;
+              const rotation=turn*angleScale,cos=Math.cos(rotation),sin=Math.sin(rotation);
+              const vx=dx*cos-dy*sin-dy*offset*lateralScale;
+              const vy=dx*sin+dy*cos+dx*offset*lateralScale;
               const wasFleeing=!!e.aiFleeActive,priorHeading=e.angle,priorX=e.x,priorY=e.y;
               this.move(e,vx,vy,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');
               if(!wasFleeing&&threat.type==='r')this.aiFleeStarted(e,threat,distance,priorHeading,priorX,priorY);
