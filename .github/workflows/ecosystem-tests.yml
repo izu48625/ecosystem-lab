@@ -21,19 +21,3 @@ jobs:
         run: node tests/predator-balance.js 3
       - name: Sample paired Normal vs AI escape evolution
         run: node tests/escape-comparison.js 4
-
-  telemetry_study:
-    name: AI1 escape study offsets ${{ matrix.offset }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        offset: [0, 25, 50, 75]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Compare AI1 escape by generation for 25 seeds
-        run: node tests/escape-telemetry-study.js ${{ matrix.offset }} 25 clone
