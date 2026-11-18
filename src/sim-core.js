@@ -18,6 +18,7 @@
   // 10 sensory inputs -> 8 hidden units -> 3 action parameters (115 weights).
   const BRAIN_INPUTS=10,BRAIN_HIDDEN=8,BRAIN_OUTPUTS=3;
   const BRAIN_SIZE=(BRAIN_INPUTS+1)*BRAIN_HIDDEN+(BRAIN_HIDDEN+1)*BRAIN_OUTPUTS;
+  const ESCAPE_MUTATION=Object.freeze({probability:.02,maxDelta:.10});
   function initialBrain(seed,id){
     let state=(seed^Math.imul(id,0x9e3779b1))>>>0;
     const rand=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296};
@@ -69,7 +70,7 @@
     mutateBrain(parent){
       let changed=0;
       const child=parent.genome.map(w=>{
-        if(this.rnd()<.08){changed++;return clamp(w+(this.rnd()*2-1)*.34,-3,3)}
+        if(this.rnd()<ESCAPE_MUTATION.probability){changed++;return clamp(w+(this.rnd()*2-1)*ESCAPE_MUTATION.maxDelta,-3,3)}
         return w;
       });
       this.stats.ai.offspring++;
@@ -279,5 +280,5 @@
     run(days=Number.isFinite(this.settings.duration)?this.settings.duration:this.day+100,step=.08){if(!Number.isFinite(days))throw new RangeError('Run target day must be finite');let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
     summary(){return {seed:this.settings.seed,day:Number(this.day.toFixed(3)),counts:this.counts(),stats:this.stats,grass:Number(this.grassTotal().toFixed(3)),history:this.history}}
   }
-  return {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL,BRAIN_SIZE,neuralForward};
+  return {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL,BRAIN_SIZE,ESCAPE_MUTATION,neuralForward};
 });
