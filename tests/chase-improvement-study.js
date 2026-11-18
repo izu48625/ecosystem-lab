@@ -2,7 +2,7 @@
 /* Reproducible chase-initiated no-hit survival + ecological tradeoff study.
    No predator behavior changes; instrumentation wraps existing methods.
    node tests/chase-improvement-study.js <seedOffset> <count> <seedBase> <comma-separated arms>
-   Arms: normal,baseline,clone,early,guard,wide
+   Arms: normal,baseline,clone,early,guard,wide,guardClone,wideClone
 */
 const assert=require('node:assert/strict');
 const {Lab,SPECIES}=require('../src/sim-core.js');
@@ -11,7 +11,7 @@ const base=Number(process.argv[4]??20261117);
 const selected=(process.argv[5]||'normal,baseline,clone,early,guard,wide').split(',');
 assert.ok(Number.isInteger(offset)&&offset>=0&&Number.isInteger(count)&&count>=1&&count<=100);
 assert.ok(Number.isInteger(base)&&base>0);
-const allowed=['normal','baseline','clone','early','guard','wide'];
+const allowed=['normal','baseline','clone','early','guard','wide','guardClone','wideClone'];
 assert.ok(selected.length>=2&&new Set(selected).size===selected.length&&selected.every(x=>allowed.includes(x)));
 const options={green:100,red:20,blue:0,regrowth:100,variance:10,duration:100};
 const groups=['0','1-2','3-5','6-9','10+'];
@@ -67,8 +67,9 @@ function observeChase(lab){
  return {totals,byGen,targetCount:()=>targetSelections};
 }
 function simulate(seed,arm){
- const normal=arm==='normal',clone=arm==='clone';
- const lab=new Lab({...options,seed,mode:normal?'normal':'escape',escapePolicy:['early','guard','wide'].includes(arm)?arm:'baseline'});
+ const normal=arm==='normal',clone=arm==='clone'||arm==='guardClone'||arm==='wideClone';
+ const selectedPolicy=arm==='guardClone'?'guard':arm==='wideClone'?'wide':arm;
+ const lab=new Lab({...options,seed,mode:normal?'normal':'escape',escapePolicy:['early','guard','wide'].includes(selectedPolicy)?selectedPolicy:'baseline'});
  if(clone){
   const actual=lab.mutateBrain;
   lab.mutateBrain=function(parent){
