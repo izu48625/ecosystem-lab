@@ -110,7 +110,7 @@ function exportCSV(){
 } 
 function exportEscapeCSV(){
  if(activeTab!=='ai1')return;
- const ai=lab.stats.ai,keys=['day','kind','greenId','generation','redId','startDistance','turnDeg','awayDeg','outcome'];
+ const ai=lab.stats.ai,keys=['day','kind','greenId','generation','redId','startDistance','turnDeg','awayDeg','outcome','detail','pursuitDays'];
  const rows=[keys.join(','),...ai.escapeEvents.map(event=>keys.map(k=>event[k]??'').join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');
