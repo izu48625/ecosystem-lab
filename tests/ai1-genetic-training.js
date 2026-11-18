@@ -85,10 +85,12 @@ function evolveOnce(brains,arm,trainingCases,random){
    p1=pool[Math.floor(random()*pool.length)];
    p2=pool[Math.floor(random()*pool.length)];
   }
-  const child=p1.map((w,i)=>random()<.30?p2[i]:w);
+  // Clonal control copies a whole parent's genome: no mutation or recombination.
+  // Genetic arm creates small heritable variation, preserving successful solutions.
+  const child=arm==='clonal'?p1.slice():p1.map((w,i)=>random()<.15?p2[i]:w);
   if(arm!=='clonal'){
    for(let i=0;i<child.length;i++){
-    if(random()<.07)child[i]=Math.max(-3,Math.min(3,child[i]+(random()*2-1)*.32));
+    if(random()<.04)child[i]=Math.max(-3,Math.min(3,child[i]+(random()*2-1)*.18));
    }
   }
   next.push(child);
@@ -144,6 +146,9 @@ for(let i=0;i<COUNT;i++){
  const seed=BASE+OFFSET+i,result=one(seed);
  samples.push(result);
  console.error('GA_TRAIN',i+1,'/',COUNT,'seed',seed,'holdout no-hit',ARMS.map(a=>a+':'+result.arms[a].history.at(-1).meanNoHitPct.toFixed(2)).join(', '));
+ console.error('GA_SUMMARY',JSON.stringify({seed,founder:result.arms.genetic.history[0].meanNoHitPct,
+  arms:Object.fromEntries(ARMS.map(a=>[a,{holdout:result.arms[a].history.at(-1).meanNoHitPct,
+   ecology:result.arms[a].ecology}])),released:result.released}));
 }
 fs.mkdirSync('reports/ga-training',{recursive:true});
 const path='reports/ga-training/shard-'+OFFSET+'.json';
