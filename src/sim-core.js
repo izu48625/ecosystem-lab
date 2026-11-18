@@ -59,7 +59,11 @@
       this.history=[];this.events=[];this.effects=[];
       this.stats={births:{g:0,r:0,b:0},deaths:{g:{hunt:0,starve:0,age:0,defense:0},r:{hunt:0,starve:0,age:0,defense:0},b:{hunt:0,starve:0,age:0,defense:0}},kills:{r:0,b:0},hunts:{r:0,b:0},strikes:{r:0,b:0},counters:0,
         // Exposure is the total time spent alive by all members of each species.
-        individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0},ai:{founders:0,offspring:0,mutatedOffspring:0,mutatedGenes:0,highestGeneration:0,threatDays:0,fleeDays:0,riskDays:0}};
+        individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0},ai:{founders:0,offspring:0,mutatedOffspring:0,mutatedGenes:0,highestGeneration:0,threatDays:0,fleeDays:0,riskDays:0,
+          // Observational telemetry only: no changes to movement, predators, or PRNG.
+          fleeStarts:0,startDistanceSum:0,turnSamples:0,turnDegSum:0,awayDegSum:0,
+          chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0,
+          byGeneration:{},escapeEvents:[],eventsDropped:0}};
       for(const [k,count] of [['g',this.settings.green],['r',this.settings.red],['b',this.settings.blue]]) for(let i=0;i<count;i++) this.spawn(k,this.rand(24,W-24),this.rand(24,H-24),true);
       this.record('start',this.settings.mode==='escape'?'AI①：緑の逃走判断を遺伝・突然変異させる実験を開始':'緑・赤の生物を投入');this.snapshot(0);
       return this;
@@ -78,6 +82,62 @@
       this.stats.ai.mutatedGenes+=changed;
       return child;
     }
+    aiGeneration(generation){
+      const ai=this.stats.ai,key=String(generation);
+      if(!ai.byGeneration[key])ai.byGeneration[key]={
+        born:0,fleeStarts:0,startDistanceSum:0,turnSamples:0,turnDegSum:0,awayDegSum:0,
+        chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0
+      };
+      return ai.byGeneration[key];
+    }
+    aiLog(event){
+      const ai=this.stats.ai;
+      if(ai.escapeEvents.length<3000)ai.escapeEvents.push(event);
+      else ai.eventsDropped++;
+    }
+    aiFleeStarted(green,red,distance,priorHeading,x,y){
+      const ai=this.stats.ai,gen=this.aiGeneration(green.generation);
+      ai.fleeStarts++;gen.fleeStarts++;
+      ai.startDistanceSum+=distance;gen.startDistanceSum+=distance;
+      const displacement=Math.hypot(green.x-x,green.y-y);
+      let turnDeg=null,awayDeg=null;
+      if(displacement>1e-8){
+        const heading=Math.atan2(green.y-y,green.x-x);
+        const away=Math.atan2(y-red.y,x-red.x);
+        const degrees=(a,b)=>Math.abs(Math.atan2(Math.sin(a-b),Math.cos(a-b)))*180/Math.PI;
+        turnDeg=degrees(heading,priorHeading);
+        awayDeg=degrees(heading,away);
+        ai.turnSamples++;gen.turnSamples++;
+        ai.turnDegSum+=turnDeg;gen.turnDegSum+=turnDeg;
+        ai.awayDegSum+=awayDeg;gen.awayDegSum+=awayDeg;
+      }
+      this.aiLog({
+        day:Number(this.day.toFixed(3)),kind:'flee_start',
+        greenId:green.id,generation:green.generation,redId:red.id,
+        startDistance:Number(distance.toFixed(2)),
+        turnDeg:turnDeg===null?null:Number(turnDeg.toFixed(2)),
+        awayDeg:awayDeg===null?null:Number(awayDeg.toFixed(2))
+      });
+    }
+    aiChaseStart(red,green){
+      if(this.settings.mode!=='escape'||red.type!=='r')return;
+      if(red.aiChase)this.aiChaseFinish(red,'other');
+      red.aiChase={greenId:green.id,generation:green.generation};
+      this.stats.ai.chaseStarts++;this.aiGeneration(green.generation).chaseStarts++;
+    }
+    aiChaseFinish(red,outcome){
+      const ongoing=red.aiChase;
+      if(!ongoing)return;
+      const ai=this.stats.ai,group=this.aiGeneration(ongoing.generation);
+      const field={escaped:'chaseEscaped',caught:'chaseCaught',other:'chaseOther'}[outcome];
+      ai[field]++;group[field]++;
+      if(outcome==='escaped'||outcome==='caught')this.aiLog({
+        day:Number(this.day.toFixed(3)),kind:'chase_end',
+        greenId:ongoing.greenId,generation:ongoing.generation,redId:red.id,
+        outcome,startDistance:null,turnDeg:null,awayDeg:null
+      });
+      red.aiChase=null;
+    }
     spawn(type,x,y,initial=false,parent=null){
       const t=SPECIES[type], variation=()=>1+this.rand(-this.settings.variance,this.settings.variance);
       const temperament= type==='g'?(this.rnd()<.25?'timid':this.rnd()<.333?'brave':'normal'):(this.rnd()<.5?'bold':'careful');
@@ -90,6 +150,7 @@
         e.parentId=parent?parent.id:null;
         if(!parent)this.stats.ai.founders++;
         this.stats.ai.highestGeneration=Math.max(this.stats.ai.highestGeneration,e.generation);
+        this.aiGeneration(e.generation).born++;
       }
       this.entities.push(e);return e;
     }
@@ -103,12 +164,21 @@
       const reference=[-.45,.15,1,0,.65,.65,.9,0,0,.8];
       const meanDangerSignal=this.settings.mode==='escape'&&aliveGreen.length?
         aliveGreen.reduce((sum,e)=>sum+neuralForward(e.genome,reference)[2],0)/aliveGreen.length:0;
-      this.history.push({day:d,...n,aiMeanGeneration:Number(meanGeneration.toFixed(3)),aiEscapeBias:Number(meanDangerSignal.toFixed(3)),aiOffspring:ai.offspring,aiMutated:ai.mutatedOffspring,aiFleeDays:Number(ai.fleeDays.toFixed(2)),grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters,
+      this.history.push({day:d,...n,aiMeanGeneration:Number(meanGeneration.toFixed(3)),aiEscapeBias:Number(meanDangerSignal.toFixed(3)),aiOffspring:ai.offspring,aiMutated:ai.mutatedOffspring,aiFleeDays:Number(ai.fleeDays.toFixed(2)),
+        aiFleeStarts:ai.fleeStarts,
+        aiMeanFleeStartDistance:ai.fleeStarts?Number((ai.startDistanceSum/ai.fleeStarts).toFixed(2)):null,
+        aiMeanTurnDeg:ai.turnSamples?Number((ai.turnDegSum/ai.turnSamples).toFixed(2)):null,
+        aiMeanAwayDeg:ai.turnSamples?Number((ai.awayDegSum/ai.turnSamples).toFixed(2)):null,
+        aiChaseStarts:ai.chaseStarts,aiChaseEscaped:ai.chaseEscaped,aiChaseCaught:ai.chaseCaught,
+        aiChaseOther:ai.chaseOther,
+        aiChaseDistanceBreakPct:(ai.chaseEscaped+ai.chaseCaught)?Number((100*ai.chaseEscaped/(ai.chaseEscaped+ai.chaseCaught)).toFixed(2)):null,
+        grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters,
         daysr:this.stats.individualDays.r,daysb:this.stats.individualDays.b,edger:this.stats.edgeDays.r,edgeb:this.stats.edgeDays.b,starvegrassg:this.stats.starveWithGlobalGrass.g})}
     particle(x,y,color,n=6){for(let i=0;i<n;i++)this.effects.push({x,y,vx:this.rand(-45,45),vy:this.rand(-45,45),life:this.rand(.25,.65),color})}
     die(a,reason,killer=null){
       if(!a.alive)return;
       a.alive=false;this.stats.deaths[a.type][reason]++;
+      if(this.settings.mode==='escape'&&a.type==='r')this.aiChaseFinish(a,'other');
       if(reason==='starve'){
         // Global grass alone cannot indicate whether an individual could reach food.
         if(this.grassTotal()>.5)this.stats.starveWithGlobalGrass[a.type]++;
@@ -208,7 +278,10 @@
               const rotation=turn*1.05,cos=Math.cos(rotation),sin=Math.sin(rotation);
               const vx=dx*cos-dy*sin-dy*offset*.55;
               const vy=dx*sin+dy*cos+dx*offset*.55;
+              const wasFleeing=!!e.aiFleeActive,priorHeading=e.angle,priorX=e.x,priorY=e.y;
               this.move(e,vx,vy,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');
+              if(!wasFleeing&&threat.type==='r')this.aiFleeStarted(e,threat,distance,priorHeading,priorX,priorY);
+              e.aiFleeActive=true;
               this.stats.ai.fleeDays+=dt;
               fleeing=true;
             }else this.stats.ai.riskDays+=dt;
@@ -218,6 +291,7 @@
             fleeing=true;
           }
           if(!fleeing){
+            if(escapeAI)e.aiFleeActive=false;
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
             for(const [vx,vy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=clamp(cx+vx,0,GRID_X-1),ny=clamp(cy+vy,0,GRID_Y-1),n=this.grass[ny*GRID_X+nx];if(n>food+.18){food=n;tx=(nx+.5)*CELL;ty=(ny+.5)*CELL}}
@@ -232,8 +306,12 @@
           let target=null;
           if(needsFood){
             if(e.targetId)target=this.entities.find(a=>a.id===e.targetId&&a.alive&&a.type==='g');
-            if(target&&Math.hypot(e.x-target.x,e.y-target.y)>200*e.view)target=null;
-            if(!target){target=this.nearest(e,index,185*e.view,'g');if(target){e.targetId=target.id;e.hunts=(e.hunts||0)+1;this.stats.hunts[e.type]++}}
+            if(target&&Math.hypot(e.x-target.x,e.y-target.y)>200*e.view){
+              if(this.settings.mode==='escape'&&e.type==='r')this.aiChaseFinish(e,'escaped');
+              target=null;
+            }
+            if(!target&&e.aiChase)this.aiChaseFinish(e,'other');
+            if(!target){target=this.nearest(e,index,185*e.view,'g');if(target){e.targetId=target.id;e.hunts=(e.hunts||0)+1;this.stats.hunts[e.type]++;if(e.type==='r')this.aiChaseStart(e,target)}}
           }
           if(target){
             this.move(e,target.x-e.x,target.y-e.y,dt,(e.type==='r'?165:145)*e.speed,15);
@@ -249,9 +327,10 @@
                   if(this.stats.counters===1)this.record('counter','草食生物が初めて反撃');
                 }
               }
-              if(target.hp<=0 && target.alive){this.die(target,'hunt',e);e.targetId=null}
+              if(target.hp<=0 && target.alive){if(e.type==='r')this.aiChaseFinish(e,'caught');this.die(target,'hunt',e);e.targetId=null}
             }
           }else{
+            if(e.aiChase)this.aiChaseFinish(e,'other');
             e.targetId=null;if(this.day>=e.turnAt){e.turnAt=this.day+this.rand(.16,.55);e.angle+=this.rand(-1.8,1.8)}
             this.move(e,Math.cos(e.angle),Math.sin(e.angle),dt,75*e.speed,0,'wander');
           }
