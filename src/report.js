@@ -17,7 +17,8 @@ const groupConfig=[
 ];
 const blankGroup=()=>({
  born:0,fleeStarts:0,startDistanceSum:0,turnSamples:0,
- turnDegSum:0,awayDegSum:0,chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0
+ turnDegSum:0,awayDegSum:0,chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0,
+ encounterStarts:0,encounterSurvived:0,encounterHit:0,encounterDiedOther:0
 });
 function generationTable(ai){
  return groupConfig.map(group=>{
@@ -34,6 +35,9 @@ function generationTable(ai){
      turn:out.turnSamples?(out.turnDegSum/out.turnSamples).toFixed(1):'—',
      away:out.turnSamples?(out.awayDegSum/out.turnSamples).toFixed(1):'—',
      breakRate:percent(out.chaseEscaped,resolved),
+     attackFreeRate:percent(out.encounterSurvived,
+       out.encounterSurvived+out.encounterHit+out.encounterDiedOther),
+     encounterPending:out.encounterStarts-out.encounterSurvived-out.encounterHit-out.encounterDiedOther,
      resolved,open:out.chaseStarts-out.chaseEscaped-out.chaseCaught-out.chaseOther
    };
  });
@@ -46,6 +50,13 @@ function tacticalData(ai){
    turn:ai.turnSamples?(ai.turnDegSum/ai.turnSamples).toFixed(1):'—',
    away:ai.turnSamples?(ai.awayDegSum/ai.turnSamples).toFixed(1):'—',
    breakRate:percent(ai.chaseEscaped,resolved),
+   attackFreeRate:percent(ai.encounterSurvived||0,
+     (ai.encounterSurvived||0)+(ai.encounterHit||0)+(ai.encounterDiedOther||0)),
+   encounterStarts:ai.encounterStarts||0,
+   encounterSurvived:ai.encounterSurvived||0,
+   encounterHit:ai.encounterHit||0,
+   encounterDiedOther:ai.encounterDiedOther||0,
+   encounterPending:(ai.encounterStarts||0)-(ai.encounterSurvived||0)-(ai.encounterHit||0)-(ai.encounterDiedOther||0),
    chases:ai.chaseStarts||0,escaped:ai.chaseEscaped||0,caught:ai.chaseCaught||0,
    other:ai.chaseOther||0,unresolved:(ai.chaseStarts||0)-resolved-(ai.chaseOther||0),
    rows:generationTable(ai),eventsDropped:ai.eventsDropped||0
@@ -118,10 +129,11 @@ function render(lab){
    set('rrStartDistance',t.distance==='—'?'—':t.distance+'px');
    set('rrTurnAngle',t.turn==='—'?'—':t.turn+'°');
    set('rrChaseBreak',t.breakRate);
+   set('rrAttackFree',t.attackFreeRate);
    set('reportLogInfo','個別イベント記録 '+pretty(lab.stats.ai.escapeEvents.length)+'件'+(t.eventsDropped?'／上限超過 '+pretty(t.eventsDropped)+'件は個別ログ省略':'')+'。日別・世代別の集計は全件。');
    $('reportGenerationRows').innerHTML=t.rows.map(row=>
      '<tr><td>'+row.name+'</td><td>'+pretty(row.fleeStarts)+'</td><td>'+row.distance+
-     '</td><td>'+(row.turn==='—'?'—':row.turn+'°')+'</td><td>'+row.chaseEscaped+' / '+row.resolved+'</td></tr>'
+     '</td><td>'+(row.turn==='—'?'—':row.turn+'°')+'</td><td>'+row.chaseEscaped+' / '+row.resolved+'</td><td>'+row.attackFreeRate+'</td></tr>'
    ).join('');
  }
  set('reportMode',d.isAI?'AI① 逃走進化':'ノーマル（学習なし）');
@@ -174,28 +186,31 @@ function exportPNG(){
    const cards=[
      ['平均逃走開始距離',t.distance==='—'?'—':t.distance+'px'],
      ['平均方向転換角',t.turn==='—'?'—':t.turn+'°'],
-     ['追跡距離離脱率',t.breakRate]
+     ['追跡距離離脱率',t.breakRate],
+     ['接近後1日無被弾',t.attackFreeRate]
    ];
    cards.forEach(([label,val],i)=>{
-     const x=74+i*319;
-     rect(x,1113,299,92,'#204338',10);
-     txt(label,x+12,1145,19,'#a4d4bc');
-     txt(val,x+12,1188,34,'#d6ffde','800');
+     const x=74+i*237;
+     rect(x,1113,225,92,'#204338',10);
+     txt(label,x+10,1145,18,'#a4d4bc');
+     txt(val,x+10,1188,31,'#d6ffde','800');
    });
    txt('緑の世代',75,1241,19,'#afd4c3');
-   txt('逃走開始',300,1241,19,'#afd4c3');
-   txt('距離(px)',490,1241,19,'#afd4c3');
-   txt('転換角',650,1241,19,'#afd4c3');
-   txt('追跡離脱 / 決着',794,1241,19,'#afd4c3');
+   txt('逃走開始',270,1241,18,'#afd4c3');
+   txt('距離(px)',420,1241,18,'#afd4c3');
+   txt('転換角',550,1241,18,'#afd4c3');
+   txt('離脱/決着',675,1241,18,'#afd4c3');
+   txt('1日無被弾',855,1241,18,'#afd4c3');
    t.rows.forEach((row,i)=>{
      const y=1284+i*40;
      txt(row.name,75,y,21,'#e6fff0');
-     txt(String(row.fleeStarts),300,y,21,'#e6fff0');
-     txt(String(row.distance),490,y,21,'#e6fff0');
-     txt(row.turn==='—'?'—':row.turn+'°',650,y,21,'#e6fff0');
-     txt(row.chaseEscaped+' / '+row.resolved,794,y,21,'#d4f7df');
+     txt(String(row.fleeStarts),270,y,20,'#e6fff0');
+     txt(String(row.distance),420,y,20,'#e6fff0');
+     txt(row.turn==='—'?'—':row.turn+'°',550,y,20,'#e6fff0');
+     txt(row.chaseEscaped+' / '+row.resolved,675,y,20,'#d4f7df');
+     txt(row.attackFreeRate,855,y,20,'#d4f7df');
    });
-   txt('離脱＝赤が追跡中に200×視野の距離を超えた。途中解除や未決着は除外。',74,1472,18,'#9fcbb5');
+   txt('1日無被弾＝赤が120pxに接近後、1日間攻撃を受けず生存。未決着除外。',74,1472,18,'#9fcbb5');
  }
  const infoShift=reportExtra;
  rect(52,1055+infoShift,976,287,'#142e29',15);
@@ -227,7 +242,7 @@ function exportPNG(){
 function exportGenerationCSV(){
  if(!activeLab||activeLab.settings.mode!=='escape')return;
  const ai=activeLab.stats.ai;
- const keys=['generation','born','flee_starts','mean_start_distance_px','mean_turn_deg','mean_away_deviation_deg','chase_starts','chase_distance_breaks','chase_caught','chase_other','chase_open','distance_break_pct_resolved'];
+ const keys=['generation','born','flee_starts','mean_start_distance_px','mean_turn_deg','mean_away_deviation_deg','chase_starts','chase_distance_breaks','chase_caught','chase_other','chase_open','distance_break_pct_resolved','encounters_120px','encounter_1d_survived_unhit','encounter_hit','encounter_died_other','encounter_open','attackfree_1d_pct_resolved'];
  const rows=[keys.join(',')];
  for(const [gen,v] of Object.entries(ai.byGeneration).sort((a,b)=>Number(a[0])-Number(b[0]))){
    const resolved=v.chaseEscaped+v.chaseCaught;
@@ -237,7 +252,11 @@ function exportGenerationCSV(){
      v.turnSamples?(v.turnDegSum/v.turnSamples).toFixed(3):'',
      v.turnSamples?(v.awayDegSum/v.turnSamples).toFixed(3):'',
      v.chaseStarts,v.chaseEscaped,v.chaseCaught,v.chaseOther,
-     v.chaseStarts-resolved-v.chaseOther,resolved?(100*v.chaseEscaped/resolved).toFixed(3):''
+     v.chaseStarts-resolved-v.chaseOther,resolved?(100*v.chaseEscaped/resolved).toFixed(3):'',
+     v.encounterStarts||0,v.encounterSurvived||0,v.encounterHit||0,v.encounterDiedOther||0,
+     (v.encounterStarts||0)-(v.encounterSurvived||0)-(v.encounterHit||0)-(v.encounterDiedOther||0),
+     (v.encounterSurvived+v.encounterHit+v.encounterDiedOther)?
+      (100*v.encounterSurvived/(v.encounterSurvived+v.encounterHit+v.encounterDiedOther)).toFixed(3):''
    ].join(','));
  }
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
