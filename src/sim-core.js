@@ -51,9 +51,9 @@
         variance:clamp(Number(settings.variance??10),0,25)/100,
         regrowth:clamp(Number(settings.regrowth??100),20,250)/100,
         mode:settings.mode==='escape'?'escape':'normal',
-        // Research variants are green-only. 'baseline' preserves the currently published AI1.
+        // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
-          settings.escapePolicy:'baseline',
+          settings.escapePolicy:'wide',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
         duration:settings.duration===Infinity?Infinity:clamp(Number(settings.duration??100),1,5000000)
       };
