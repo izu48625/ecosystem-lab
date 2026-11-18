@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
-const {Lab,SPECIES}=require('../src/sim-core.js');
+const {Lab,SPECIES,ESCAPE_MUTATION}=require('../src/sim-core.js');
 function testDefault(){
  const a=new Lab({seed:20261117});
  assert.deepEqual(a.counts(),{g:100,r:10,b:10});
@@ -114,6 +114,25 @@ function testNeuroevolution(){
  assert.deepEqual(ai.summary(),replay.summary(),'Neuroevolution must be reproducible at same seed and step');
  console.log('✓ AI①の神経回路・遺伝・変異・世代交代・赤の固定行動を検証');
 }
+function testGentlerMutation(){
+ assert.deepEqual(ESCAPE_MUTATION,{probability:.02,maxDelta:.10});
+ const lab=new Lab({seed:19910101,green:1,red:0,blue:0,mode:'escape'});
+ const parent=lab.entities[0],genes=parent.genome.length;
+ let mutated=0;
+ for(let i=0;i<200;i++){
+   const child=lab.mutateBrain(parent);
+   assert.equal(child.length,genes);
+   for(let j=0;j<genes;j++){
+     const difference=Math.abs(child[j]-parent.genome[j]);
+     assert.ok(difference<=.100000001,'Mutation magnitude must not exceed ±0.10');
+     if(difference>1e-10)mutated++;
+   }
+ }
+ assert.ok(mutated>200&&mutated<700,'Per-gene mutation frequency should be near 2%');
+ assert.equal(lab.stats.ai.offspring,200);
+ assert.equal(lab.stats.ai.mutatedGenes,mutated);
+ console.log('✓ AI①遺伝子の変異は確率2%、最大±0.10である');
+}
 function testUnchangedRedRules(){
  const input={seed:424242,green:0,red:10,blue:0,variance:10,regrowth:100,duration:40};
  const n=new Lab({...input,mode:'normal'});
@@ -128,4 +147,5 @@ function testUnchangedRedRules(){
 }
 testLastChanceMeal();testWalls();
 testNeuroevolution();
+testGentlerMutation();
 testUnchangedRedRules();
