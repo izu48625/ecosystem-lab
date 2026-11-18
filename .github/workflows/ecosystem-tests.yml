@@ -36,4 +36,4 @@ jobs:
         with:
           node-version: '22'
       - name: Compare 5 mutation settings over 25 matched seeds
-        run: node tests/escape-mutation-sweep.js ${{ matrix.offset }} 25
+        run: node tests/escape-mutation-sweep.js ${{ matrix.offset }} 25 20261217
