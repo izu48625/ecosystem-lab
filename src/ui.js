@@ -104,13 +104,15 @@ function frame(t){
 function exportCSV(){
  const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg','aiMeanGeneration','aiEscapeBias','aiOffspring','aiMutated','aiFleeDays',
   'aiFleeStarts','aiMeanFleeStartDistance','aiMeanTurnDeg','aiMeanAwayDeg',
-  'aiChaseStarts','aiChaseEscaped','aiChaseCaught','aiChaseOther','aiChaseDistanceBreakPct'];
+  'aiChaseStarts','aiChaseEscaped','aiChaseCaught','aiChaseOther','aiChaseDistanceBreakPct',
+  'aiEncounterStarts','aiEncounterSurvived','aiEncounterHit','aiEncounterDiedOther',
+  'aiEncounterPending','aiAttackFree1dPct'];
  const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]??'').join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ecosystem_${lab.settings.mode}_seed_${lab.settings.seed}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
 } 
 function exportEscapeCSV(){
  if(activeTab!=='ai1')return;
- const ai=lab.stats.ai,keys=['day','kind','greenId','generation','redId','startDistance','turnDeg','awayDeg','outcome','detail','pursuitDays'];
+ const ai=lab.stats.ai,keys=['day','kind','greenId','generation','redId','startDistance','turnDeg','awayDeg','outcome','detail','pursuitDays','startDay','startEnergy','windowDays'];
  const rows=[keys.join(','),...ai.escapeEvents.map(event=>keys.map(k=>event[k]??'').join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');
