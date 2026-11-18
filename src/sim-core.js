@@ -54,6 +54,9 @@
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
+        // Optional AI1-only tactics. 'baseline' leaves the released AI1 unchanged.
+        escapeStrategy:['alert','multi','wall','combo','budget','adaptive'].includes(settings.escapeStrategy)?
+          settings.escapeStrategy:'baseline',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
         duration:settings.duration===Infinity?Infinity:clamp(Number(settings.duration??100),1,5000000)
       };
@@ -292,13 +295,13 @@
       for(const a of this.entities)if(a.alive){const col=clamp(Math.floor(a.x/cellSize),0,nx-1),row=clamp(Math.floor(a.y/cellSize),0,ny-1);buckets[row*nx+col].push(a)}
       return {cellSize,nx,ny,buckets};
     }
-    nearest(a,index,range,type){
+    nearest(a,index,range,type,excludeId=null){
       const {cellSize,nx,ny,buckets}=index;
       const minX=clamp(Math.floor((a.x-range)/cellSize),0,nx-1),maxX=clamp(Math.floor((a.x+range)/cellSize),0,nx-1);
       const minY=clamp(Math.floor((a.y-range)/cellSize),0,ny-1),maxY=clamp(Math.floor((a.y+range)/cellSize),0,ny-1);
       let best=null,bestD=range*range;
       for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++)for(const other of buckets[y*nx+x]){
-        if(other===a || !other.alive || other.type!==type)continue;
+        if(other===a || !other.alive || other.type!==type || (excludeId!==null&&other.id===excludeId))continue;
         const dx=a.x-other.x,dy=a.y-other.y,d=dx*dx+dy*dy;if(d<bestD){best=other;bestD=d}
       }
       return best;
@@ -348,17 +351,54 @@
             // The network evolves when to flee and which route/lateral dodge to take.
             const alarm=proximity+urge*.33;
             const policy=this.settings.escapePolicy;
-            const threshold=policy==='wide'?.25+hunger*.19:
+            const strategy=this.settings.escapeStrategy;
+            const earlier=['alert','combo','adaptive'].includes(strategy);
+            const threshold=earlier?.19+hunger*.14:
+              policy==='wide'?.25+hunger*.19:
               policy==='early'?.30+hunger*.22:
               policy==='guard'?.31+hunger*.22:.39+hunger*.25;
+            // Controlled trade-off: only 'budget' accepts more distant danger if starving.
+            const foodBudget=strategy==='budget'&&e.energy<34&&distance>105*e.view?.11*(34-e.energy)/34:0;
             this.stats.ai.threatDays+=dt;
-            if(alarm>threshold){
-              const dx=e.x-threat.x,dy=e.y-threat.y;
-              const angleScale=policy==='guard'?.65:policy==='wide'?.65:1.05;
-              const lateralScale=policy==='guard'?.30:policy==='wide'?.30:.55;
+            if(alarm>threshold+foodBudget){
+              let dx=e.x-threat.x,dy=e.y-threat.y;
+              const tuned=earlier;
+              const angleScale=tuned?.48:policy==='guard'?.65:policy==='wide'?.65:1.05;
+              const lateralScale=tuned?.19:policy==='guard'?.30:policy==='wide'?.30:.55;
               const rotation=turn*angleScale,cos=Math.cos(rotation),sin=Math.sin(rotation);
-              const vx=dx*cos-dy*sin-dy*offset*lateralScale;
-              const vy=dx*sin+dy*cos+dx*offset*lateralScale;
+              let vx=dx*cos-dy*sin-dy*offset*lateralScale;
+              let vy=dx*sin+dy*cos+dx*offset*lateralScale;
+              if(['multi','combo','adaptive'].includes(strategy)&&threat.type==='r'){
+                // Additional predator is a competing risk; never modify either predator's state.
+                const second=this.nearest(e,index,145*e.view,'r',threat.id);
+                if(second){
+                  const d2=Math.hypot(e.x-second.x,e.y-second.y);
+                  const pressure=.72*clamp((170*e.view-d2)/(150*e.view),0,1);
+                  const vlen=Math.max(1,Math.hypot(vx,vy));
+                  vx+=vlen*pressure*(e.x-second.x)/Math.max(1,d2);
+                  vy+=vlen*pressure*(e.y-second.y)/Math.max(1,d2);
+                }
+              }
+              if(['wall','combo','adaptive'].includes(strategy)){
+                const length=Math.max(1,Math.hypot(vx,vy)),px=e.x+vx/length*65,py=e.y+vy/length*65;
+                vx+=Math.max(0,55-px)*1.35-Math.max(0,px-(W-55))*1.35;
+                vy+=Math.max(0,55-py)*1.35-Math.max(0,py-(H-55))*1.35;
+              }
+              if(strategy==='adaptive'&&e.energy<40&&distance>80*e.view){
+                // Prefer a greener destination within a narrow angular escape cone.
+                // Neural turn/lateral outputs remain active. No movement speed change.
+                const length=Math.max(1,Math.hypot(vx,vy)),ux=vx/length,uy=vy/length;
+                const projected=this.grass[this.gridIndex(e.x+ux*48,e.y+uy*48)];
+                let best=projected,bx=ux,by=uy;
+                for(const sign of [-1,1]){
+                  const cc=Math.cos(.34),ss=Math.sin(.34)*sign;
+                  const nx=ux*cc-uy*ss,ny=ux*ss+uy*cc;
+                  const ix=clamp(e.x+nx*48,9,W-9),iy=clamp(e.y+ny*48,9,H-9);
+                  const grass=this.grass[this.gridIndex(ix,iy)];
+                  if(grass>best+.13){best=grass;bx=nx;by=ny}
+                }
+                vx=bx*length;vy=by*length;
+              }
               const wasFleeing=!!e.aiFleeActive,priorHeading=e.angle,priorX=e.x,priorY=e.y;
               this.move(e,vx,vy,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');
               if(!wasFleeing&&threat.type==='r')this.aiFleeStarted(e,threat,distance,priorHeading,priorX,priorY);
