@@ -11,7 +11,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict');
 const {Lab,BRAIN_SIZE,SPECIES}=require('../src/sim-core.js');
 const OFFSET=Number(process.argv[2]??0),COUNT=Number(process.argv[3]??5),BASE=Number(process.argv[4]??20370001);
 assert.ok(Number.isInteger(OFFSET)&&OFFSET>=0&&Number.isInteger(COUNT)&&COUNT>=1&&COUNT<=10);
-const MODES=['released','random25','elite10','elite25','elite50'];
+const MODES=['released','random10','random25','random50','elite10','elite25','elite50'];
 function hash(seed,v){
  let x=(seed^Math.imul(v,0x9e3779b1))>>>0;
  x=Math.imul(x^(x>>>16),0x7feb352d);x=Math.imul(x^(x>>>15),0x846ca68b);
@@ -26,8 +26,11 @@ function world(seed,arm,elite){
  const initialGenomes=green.map(e=>e.genome.slice());
  if(arm!=='released'){
   assert.equal(elite.length,BRAIN_SIZE);
-  const n=arm==='elite10'?10:arm==='elite50'?50:25;
-  const genome=arm==='random25'?initialGenomes[hash(seed,91221)%100]:elite;
+  const n=arm.endsWith('10')?10:arm.endsWith('50')?50:25;
+  // The control genome comes from the same initial founder pool as the trained elite.
+  const reference=new Lab({seed,green:30,red:0,blue:0,mode:'escape'});
+  const founders=reference.entities.filter(e=>e.type==='g');
+  const genome=arm.startsWith('random')?founders[hash(seed,91221)%founders.length].genome:elite;
   const chosen=[...green].sort((a,b)=>hash(seed,a.id)-hash(seed,b.id)||a.id-b.id).slice(0,n);
   for(const e of chosen){e.genome=genome.slice();e.trainedLineage=true;}
   const originalSpawn=lab.spawn;
