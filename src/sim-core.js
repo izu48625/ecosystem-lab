@@ -52,6 +52,8 @@
         regrowth:clamp(Number(settings.regrowth??100),20,250)/100,
         mode:settings.mode==='escape'?'escape':'normal',
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
+        // Study-only AI1 forage strategies; baseline remains the default until validated.
+        foragePolicy:['route','adaptive'].includes(settings.foragePolicy)?settings.foragePolicy:'baseline',
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
@@ -332,6 +334,7 @@
           if(escapeAI)this.aiEncounterObserve(e,danger);
           const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
+          const forageAI=escapeAI&&this.settings.foragePolicy!=='baseline';
           let fleeing=false;
           if(threat&&escapeAI){
             const distance=Math.max(.01,Math.hypot(e.x-threat.x,e.y-threat.y));
@@ -348,9 +351,13 @@
             // The network evolves when to flee and which route/lateral dodge to take.
             const alarm=proximity+urge*.33;
             const policy=this.settings.escapePolicy;
-            const threshold=policy==='wide'?.25+hunger*.19:
+            const baseThreshold=policy==='wide'?.25+hunger*.19:
               policy==='early'?.30+hunger*.22:
               policy==='guard'?.31+hunger*.22:.39+hunger*.25;
+            // In the adaptive arm, severely hungry greens accept distant risk.
+            // Nearby predators still trigger the original early escape policy.
+            const hungryRisk=this.settings.foragePolicy==='adaptive' && distance>75*e.view;
+            const threshold=baseThreshold+(hungryRisk?.24*clamp((38-e.energy)/38,0,1):0);
             this.stats.ai.threatDays+=dt;
             if(alarm>threshold){
               const dx=e.x-threat.x,dy=e.y-threat.y;
@@ -375,7 +382,20 @@
             if(escapeAI)e.aiFleeActive=false;
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
-            for(const [vx,vy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=clamp(cx+vx,0,GRID_X-1),ny=clamp(cy+vy,0,GRID_Y-1),n=this.grass[ny*GRID_X+nx];if(n>food+.18){food=n;tx=(nx+.5)*CELL;ty=(ny+.5)*CELL}}
+            if(forageAI&&e.energy<65){
+              // Search up to two cells away for grass; avoid routes toward a visible predator.
+              let score=food;
+              for(let oy=-2;oy<=2;oy++)for(let ox=-2;ox<=2;ox++){
+                if(!ox&&!oy)continue;
+                const nx=cx+ox,ny=cy+oy;if(nx<0||nx>=GRID_X||ny<0||ny>=GRID_Y)continue;
+                const px=(nx+.5)*CELL,py=(ny+.5)*CELL,d=Math.hypot(px-e.x,py-e.y);
+                let candidate=this.grass[ny*GRID_X+nx]-.004*d;
+                if(threat){const oldD=Math.hypot(e.x-threat.x,e.y-threat.y),newD=Math.hypot(px-threat.x,py-threat.y);candidate-=.30*clamp((oldD-newD)/60,0,1)}
+                if(candidate>score+.08){score=candidate;tx=px;ty=py}
+              }
+            }else{
+              for(const [vx,vy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=clamp(cx+vx,0,GRID_X-1),ny=clamp(cy+vy,0,GRID_Y-1),n=this.grass[ny*GRID_X+nx];if(n>food+.18){food=n;tx=(nx+.5)*CELL;ty=(ny+.5)*CELL}}
+            }
             if(this.day>=e.turnAt){e.turnAt=this.day+this.rand(.22,.65);e.angle+=this.rand(-1.7,1.7)}
             const dx=tx!==null?tx-e.x:Math.cos(e.angle),dy=ty!==null?ty-e.y:Math.sin(e.angle);
             this.move(e,dx,dy,dt,55*e.speed,0,'wander');
