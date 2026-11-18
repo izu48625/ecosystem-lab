@@ -60,9 +60,9 @@ const eligible=candidates.filter(x=>
 const picked=eligible.length?eligible[0].name:null;
 const last=summary(holdout);
 let seed=8675309;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-function pairedBootstrap(samples,arm,metric){
+function pairedBootstrap(samples,arm,metric,reference='baseline'){
  const d=samples.map(x=>{
-  const a=x[arm],b=x.baseline;
+  const a=x[arm],b=x[reference];
   if(metric==='finalGreen')return a.green-b.green;
   if(metric==='starvation')return a.greenStarvePer100IndividualDays-b.greenStarvePer100IndividualDays;
   if(metric==='chase')return (a.attackFreePct??0)-(b.attackFreePct??0);
@@ -92,9 +92,9 @@ const report={
  acceptedForDeployment:accepted,
  holdoutVsNormal:control,holdoutEvolutionOnOff:evolution,
  bootstrap:{
-  wideVsNormal:{finalGreen:pairedBootstrap(holdout,'baseline','finalGreen')},
+  wideVsNormal:{finalGreen:pairedBootstrap(holdout,'baseline','finalGreen','normal')},
   candidate:picked?Object.fromEntries(['finalGreen','starvation','chase','hunted','species'].map(x=>[x,pairedBootstrap(holdout,picked,x)])):null,
-  mutationOnOff:{finalGreen:pairedBootstrap(holdout,'baselineClone','finalGreen')}
+  mutationOnOff:{finalGreen:pairedBootstrap(holdout,'baseline','finalGreen','baselineClone')}
  },
  verdict:accepted?'candidate_preset_checks_passed_review_before_deployment':'no_new_candidate_accepted',
  caveats:['Manual escapeStrategy changes must not be called evolution.', 'Conservation and performance depend on stochastic conditions.', 'The no-hit rate pools overlapping chase windows; bootstrap resamples paired independent world seeds rather than windows.','100-day species persistence does not imply an original green founder lived 100 days.']
