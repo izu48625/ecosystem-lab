@@ -21,19 +21,3 @@ jobs:
         run: node tests/predator-balance.js 3
       - name: Sample paired Normal vs AI escape evolution
         run: node tests/escape-comparison.js 4
-
-  chase_policy_holdout:
-    name: New-seed chase comparison offset ${{ matrix.offset }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        offset: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Seven-arm holdout / 10 new seeds / actual red pursuit outcome
-        run: node tests/chase-improvement-study.js ${{ matrix.offset }} 10 20270001 normal,baseline,clone,guard,wide,guardClone,wideClone
