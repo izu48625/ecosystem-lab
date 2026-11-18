@@ -10,7 +10,7 @@ permissions:
   contents: read
 jobs:
   shard:
-    name: "seed-${{ matrix.offset }}-to-${{ matrix.offset + 9 }}"
+    name: "seed-${{ matrix.offset }}"
     strategy:
       fail-fast: false
       matrix:
