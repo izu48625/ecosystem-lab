@@ -198,14 +198,44 @@ cv.addEventListener('pointerdown',e=>{const r=cv.getBoundingClientRect(),sx=(e.c
 for(const a of lab.entities){const d=Math.hypot(a.x-x,a.y-y);if(d<bestD){bestD=d;best=a}}if(best){focus=best.id;zoom=Math.max(zoom,1.7);cam.x=best.x;cam.y=best.y}else{focus=null;if(zoom>1){cam.x=x;cam.y=y}}show()});
 $('batch').onclick=async()=>{
  if($('batch').disabled)return;
- const btn=$('batch'),wasPlaying=playing;playing=false;btn.disabled=true;$('batchResult').textContent='10回の再実験を計算中…';let count={both:0,greenOnly:0,redOnly:0,none:0};let sg=0,sr=0;
- const pref=options();for(let i=0;i<10;i++){
-  const tmp=new Lab({...pref,seed:pref.seed+i});tmp.run(100,.08);const n=tmp.counts();sg+=n.g;sr+=n.r;
-  if(n.g&&n.r)count.both++;else if(n.g)count.greenOnly++;else if(n.r)count.redOnly++;else count.none++;
-  $('batchResult').textContent=`${i+1}/10 完了`;await new Promise(resolve=>setTimeout(resolve,0));
+ const btn=$('batch'),wasPlaying=playing;
+ playing=false;btn.disabled=true;
+ const pref=options(),modes=['normal','escape'],results={};
+ for(const mode of modes)results[mode]={greenAlive:0,coexist:0,finalGreen:0,finalRed:0,hunted:0,starved:0};
+ try{
+  for(let i=0;i<10;i++){
+   const seed=pref.seed+i;
+   for(const mode of modes){
+    const test=new Lab({...pref,seed,mode});
+    // Experimental worlds are independent; do not alter the currently visible ecosystem.
+    test.aiLog=function(){};test.run(100,.08);
+    const counts=test.counts(),out=results[mode];
+    if(counts.g>0)out.greenAlive++;
+    if(counts.g>0&&counts.r>0)out.coexist++;
+    out.finalGreen+=counts.g;
+    out.finalRed+=counts.r;
+    out.hunted+=test.stats.deaths.g.hunt;
+    out.starved+=test.stats.deaths.g.starve;
+   }
+   $('batchResult').textContent=`ノーマルとAI①を同じ10シードで比較中… ${i+1}/10回`;
+   await new Promise(resolve=>setTimeout(resolve,0));
+  }
+  const n=results.normal,a=results.escape;
+  const avg=v=>(v/10).toFixed(1);
+  $('batchResult').textContent=
+   `同じ10シード・各100日（参考値）\n`+
+   `緑がDAY100まで存続：ノーマル ${n.greenAlive}/10 ／ AI① ${a.greenAlive}/10\n`+
+   `赤緑の共存：ノーマル ${n.coexist}/10 ／ AI① ${a.coexist}/10\n`+
+   `緑の最終平均：ノーマル ${avg(n.finalGreen)}匹 ／ AI① ${avg(a.finalGreen)}匹\n`+
+   `緑の平均捕食死：ノーマル ${avg(n.hunted)}件 ／ AI① ${avg(a.hunted)}件\n`+
+   `緑の平均餓死：ノーマル ${avg(n.starved)}件 ／ AI① ${avg(a.starved)}件\n`+
+   `※10回は例示用。結果はシードや設定で変わります。世代交代による進化効果と手動の逃走ルール改善は別です。`;
+ }catch(error){
+  $('batchResult').textContent='比較中に問題が発生しました。設定を確認してください。';
+  console.error('Paired survival batch failed',error);
+ }finally{
+  btn.disabled=false;playing=wasPlaying&&!ended;
  }
- $('batchResult').textContent=`10回検証｜緑赤共存 ${count.both}回・緑のみ ${count.greenOnly}回・赤のみ ${count.redOnly}回・両種絶滅 ${count.none}回｜平均最終数 緑${Math.round(sg/10)} 赤${(sr/10).toFixed(1)}`;
- btn.disabled=false;playing=wasPlaying&&!ended;
 };
 reset();requestAnimationFrame(frame);
 })();
