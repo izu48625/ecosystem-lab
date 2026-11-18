@@ -20,7 +20,8 @@ const requested=(process.argv[5]||'').split(',').filter(Boolean);
 const cases=requested.length?allCases.filter(c=>requested.includes(c.key)):allCases;
 assert.ok(cases.length>0 && (!requested.length || cases.length===requested.length),'Valid mutation case names required');
 function withMutation(lab,c){
-  if(c.key==='baseline')return;
+  // Explicit per-case override preserves the old 8% ±0.34 historical baseline
+  // even after the published engine is updated to the selected 2% ±0.10.
   lab.mutateBrain=function(parent){
     let changed=0;
     const child=parent.genome.map(w=>{
