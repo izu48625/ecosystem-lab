@@ -138,7 +138,7 @@ function render(lab){
  }
  set('reportMode',d.isAI?'AI① 逃走進化':'ノーマル（学習なし）');
  set('reportInputs',d.isAI?'入力：赤の相対位置・進行方向・近さ、緑自身のHP・空腹・位置、周囲の草':'入力：緑は固定ルールで危険を判定（AIの入力・学習なし）');
- set('reportOutputs',d.isAI?'判断：逃走開始のしきい値・逃げる角度・左右への回避':'判断：敵との距離で逃走し、草を探索する既定の行動');
+ set('reportOutputs',d.isAI?(lab.settings.escapePolicy==='wide'?'判断：赤を早めに警戒し、逃走方向の大きなブレを抑制。神経回路が逃走開始と角度・左右回避を調整':'判断：逃走開始のしきい値・逃げる角度・左右への回避'):'判断：敵との距離で逃走し、草を探索する既定の行動');
  set('reportGenetics',d.isAI?`進化：10入力→8神経→3出力／115重み。出生時に親の重みを継承し、各重み${mutationRate}の確率で±${mutationAmplitude}まで変異。生存・繁殖によって自然選択。個体内の強化学習はなし。`:'赤・緑ともに行動AIの遺伝・突然変異・進化はなし。赤の捕食と繁殖条件はAI①と共通。');
  $('reportOverlay').hidden=false;
  paintGraph($('reportChart'),d);
@@ -217,7 +217,7 @@ function exportPNG(){
  txt('何を・どう学習させる？',74,1106+infoShift,30,'#dcffe8','800');
  if(d.isAI){
    txt('入力｜赤の相対位置・方向・近さ／緑のHP・空腹・位置／草',74,1159+infoShift,22,'#b7ded0');
-   txt('判断｜いつ逃げるか・逃走角度・左右回避',74,1202+infoShift,22,'#b7ded0');
+   txt('判断｜早期警戒・方向のブレを抑えた逃走／神経回路で角度を調整',74,1202+infoShift,22,'#b7ded0');
    txt('遺伝｜10入力 → 8神経 → 3出力、115重み',74,1245+infoShift,22,'#b7ded0');
    txt(`進化｜出生時に継承、各重み${mutationRate}で±${mutationAmplitude}変異`,74,1288+infoShift,22,'#b7ded0');
    txt('選択｜生存・繁殖（個体内の経験学習はなし）',74,1325+infoShift,19,'#91cbae');
