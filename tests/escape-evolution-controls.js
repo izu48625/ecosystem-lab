@@ -12,7 +12,7 @@ const assert=require('node:assert/strict');
 const {Lab,SPECIES,BRAIN_SIZE}=require('../src/sim-core.js');
 const offset=Number(process.argv[2]??0),count=Number(process.argv[3]??25);
 assert.ok(Number.isInteger(offset)&&offset>=0&&Number.isInteger(count)&&count>=1&&count<=100);
-const options={green:100,red:20,blue:0,regrowth:100,variance:10,duration:100,mode:'escape'};
+const options={green:100,red:20,blue:0,regrowth:100,variance:10,duration:100,mode:'escape',escapePolicy:'baseline'};
 const modes=['random','clone','evolve'],samples=[];
 const groups=['0','1-2','3-5','6+'];
 const bucket=g=>g===0?'0':g<=2?'1-2':g<=5?'3-5':'6+';
