@@ -206,6 +206,52 @@ function testDistanceBreakClassification(){
  assert.equal(lab.stats.ai.chaseOther,0);
  console.log('✓ 追跡解除の理由（距離離脱）を実際の赤の追跡ロジックから観測');
 }
+function testAttackFreeExposure(){
+ const options={seed:20261117,green:100,red:20,blue:0,mode:'escape',variance:10,regrowth:100,duration:100};
+ const lab=new Lab(options);
+ lab.run(100,.08);
+ // Previous pre-telemetry deterministic study (AI1 2% ±0.10):
+ const n=lab.counts(),ai=lab.stats.ai;
+ assert.deepEqual(n,{g:14,r:1,b:0},'New observational telemetry must not change population');
+ assert.equal(lab.stats.births.g,706);
+ assert.equal(lab.stats.births.r,108);
+ assert.equal(lab.stats.deaths.g.hunt,473);
+ assert.equal(lab.stats.deaths.g.starve,225);
+ assert.ok(ai.encounterStarts>0,'Red approaches should create exposure episodes');
+ assert.ok(ai.encounterSurvived>0,'Some exposures should survive attack-free for a whole day');
+ assert.ok(ai.encounterHit>0,'At least some exposures should be attacked');
+ assert.equal(ai.encounterStarts,
+   ai.encounterSurvived+ai.encounterHit+ai.encounterDiedOther+
+   lab.entities.filter(e=>e.type==='g'&&e.aiEncounter).length,
+   'Every episode resolves into attack-free survival, red attack, other death or active censoring');
+ const groups=Object.values(ai.byGeneration);
+ for(const key of ['encounterStarts','encounterSurvived','encounterHit','encounterDiedOther']){
+   assert.equal(groups.reduce((sum,g)=>sum+g[key],0),ai[key]);
+ }
+ const latest=lab.history.at(-1);
+ assert.equal(latest.aiEncounterStarts,ai.encounterStarts);
+ assert.equal(latest.aiEncounterSurvived,ai.encounterSurvived);
+ const control=new Lab({...options,mode:'normal'});control.run(100,.08);
+ assert.equal(control.stats.ai.encounterStarts,0,'Normal behavior must be untouched');
+ console.log('✓ 赤の120px接近後の1日無被弾生存を追跡し、旧シードの生態系結果を完全再現');
+ console.log('  近接エピソード:',JSON.stringify({starts:ai.encounterStarts,survived:ai.encounterSurvived,hit:ai.encounterHit,diedOther:ai.encounterDiedOther}));
+}
+function testAttackFreeOutcomes(){
+ const lab=new Lab({seed:410,green:1,red:1,blue:0,mode:'escape',duration:5});
+ const g=lab.entities.find(e=>e.type==='g'),r=lab.entities.find(e=>e.type==='r');
+ lab.day=.1;
+ lab.aiEncounterStart(g,r,80);
+ assert.equal(lab.stats.ai.encounterStarts,1);
+ lab.day=1.101;lab.aiEncounterObserve(g,null);
+ assert.equal(lab.stats.ai.encounterSurvived,1);
+ assert.equal(lab.stats.ai.encounterHit,0);
+ lab.day=1.3;lab.aiEncounterStart(g,r,95);lab.aiEncounterHit(g,r);
+ assert.equal(lab.stats.ai.encounterHit,1);
+ lab.day=1.5;lab.aiEncounterStart(g,r,100);lab.die(g,'age');
+ assert.equal(lab.stats.ai.encounterDiedOther,1);
+ assert.equal(lab.stats.ai.encounterStarts,3);
+ console.log('✓ 1日無被弾／途中被弾／その他死亡を重複なく分類');
+}
 function testUnchangedRedRules(){
  const input={seed:424242,green:0,red:10,blue:0,variance:10,regrowth:100,duration:40};
  const n=new Lab({...input,mode:'normal'});
@@ -223,4 +269,6 @@ testNeuroevolution();
 testGentlerMutation();
 testEscapeBehaviorTelemetry();
 testDistanceBreakClassification();
+testAttackFreeExposure();
+testAttackFreeOutcomes();
 testUnchangedRedRules();
