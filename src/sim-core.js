@@ -50,7 +50,9 @@
         blue:clamp(Number(settings.blue??10),0,60),
         variance:clamp(Number(settings.variance??10),0,25)/100,
         regrowth:clamp(Number(settings.regrowth??100),20,250)/100,
-        mode:settings.mode==='escape'?'escape':'normal',
+        mode:settings.mode==='social'?'social':settings.mode==='escape'?'escape':'normal',
+        // Social ablation: identical AI2 predator avoidance without neighbour steering.
+        socialEnabled:settings.socialEnabled!==false,
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
@@ -70,7 +72,7 @@
           encounterStarts:0,encounterSurvived:0,encounterHit:0,encounterDiedOther:0,
           byGeneration:{},escapeEvents:[],eventsDropped:0}};
       for(const [k,count] of [['g',this.settings.green],['r',this.settings.red],['b',this.settings.blue]]) for(let i=0;i<count;i++) this.spawn(k,this.rand(24,W-24),this.rand(24,H-24),true);
-      this.record('start',this.settings.mode==='escape'?'AI①：緑の逃走判断を遺伝・突然変異させる実験を開始':'緑・赤の生物を投入');this.snapshot(0);
+      this.record('start',this.settings.mode==='social'?'AI②：緑の群れ行動を遺伝・突然変異させる実験を開始':this.settings.mode==='escape'?'AI①：緑の逃走判断を遺伝・突然変異させる実験を開始':'緑・赤の生物を投入');this.snapshot(0);
       return this;
     }
     rnd(){this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;return this.seed/4294967296}
@@ -126,7 +128,7 @@
       });
     }
     aiChaseStart(red,green){
-      if(this.settings.mode!=='escape'||red.type!=='r')return;
+      if(this.settings.mode==='normal'||red.type!=='r')return;
       if(red.aiChase)this.aiChaseFinish(red,'other');
       red.aiChase={greenId:green.id,generation:green.generation,startDay:this.day};
       this.stats.ai.chaseStarts++;this.aiGeneration(green.generation).chaseStarts++;
@@ -169,7 +171,7 @@
       green.aiEncounter=null;
     }
     aiEncounterStart(green,red,distance){
-      if(this.settings.mode!=='escape'||green.type!=='g'||red.type!=='r')return;
+      if(this.settings.mode==='normal'||green.type!=='g'||red.type!=='r')return;
       const ai=this.stats.ai,group=this.aiGeneration(green.generation);
       green.aiEncounter={
         startDay:this.day,redId:red.id,startDistance:distance,startEnergy:green.energy
@@ -184,7 +186,7 @@
       });
     }
     aiEncounterObserve(green,red){
-      if(this.settings.mode!=='escape')return;
+      if(this.settings.mode==='normal')return;
       const active=green.aiEncounter;
       if(active&&this.day-active.startDay>=1-1e-8)this.aiEncounterFinish(green,'survived');
       const distance=red?Math.hypot(green.x-red.x,green.y-red.y):Infinity;
@@ -196,7 +198,7 @@
       }
     }
     aiEncounterHit(green,red){
-      if(this.settings.mode!=='escape'||red.type!=='r'||green.type!=='g')return;
+      if(this.settings.mode==='normal'||red.type!=='r'||green.type!=='g')return;
       // If an attack occurs before this green's update, do not miss the exposure.
       if(!green.aiEncounter && !green.aiThreatNear){
         this.aiEncounterStart(green,red,Math.hypot(green.x-red.x,green.y-red.y));
@@ -209,7 +211,7 @@
       const age=initial?(type==='g'?this.rand(0,4):this.rand(3,9)):0;
       const e={id:++this.nextId,type,x:clamp(x,9,W-9),y:clamp(y,9,H-9),angle:this.rand(-Math.PI,Math.PI),maxhp:t.hp*variation(),attack:t.attack*variation(),speed:t.speed*variation(),life:t.life*variation(),view:t.view*variation(),energy:initial?this.rand(75,98):this.rand(80,95),age,lastBirth:this.day-(initial?this.rand(0,t.reproduction):0),lastAttack:-2,lastCounter:-2,turnAt:0,children:0,kills:0,counters:0,temperament,targetId:null,phase:this.rand(0,6),alive:true,flash:0};
       e.hp=e.maxhp;
-      if(type==='g'&&this.settings.mode==='escape'){
+      if(type==='g'&&this.settings.mode!=='normal'){
         e.genome=parent?this.mutateBrain(parent):initialBrain(this.settings.seed,e.id);
         e.generation=parent?parent.generation+1:0;
         e.parentId=parent?parent.id:null;
@@ -224,12 +226,18 @@
     gridIndex(x,y){return clamp(Math.floor(y/CELL),0,GRID_Y-1)*GRID_X+clamp(Math.floor(x/CELL),0,GRID_X-1)}
     snapshot(d){const n=this.counts();
       const ai=this.stats.ai,aliveGreen=this.entities.filter(e=>e.alive&&e.type==='g');
-      const meanGeneration=this.settings.mode==='escape'&&aliveGreen.length?
+      const meanGeneration=this.settings.mode!=='normal'&&aliveGreen.length?
         aliveGreen.reduce((sum,e)=>sum+e.generation,0)/aliveGreen.length:0;
       const reference=[-.45,.15,1,0,.65,.65,.9,0,0,.8];
-      const meanDangerSignal=this.settings.mode==='escape'&&aliveGreen.length?
+      const meanDangerSignal=this.settings.mode!=='normal'&&aliveGreen.length?
         aliveGreen.reduce((sum,e)=>sum+neuralForward(e.genome,reference)[2],0)/aliveGreen.length:0;
-      this.history.push({day:d,...n,aiMeanGeneration:Number(meanGeneration.toFixed(3)),aiEscapeBias:Number(meanDangerSignal.toFixed(3)),aiOffspring:ai.offspring,aiMutated:ai.mutatedOffspring,aiFleeDays:Number(ai.fleeDays.toFixed(2)),
+      const herd=this.settings.mode==='social'?this.herdSnapshot():null;
+      this.history.push({day:d,...n,...(herd?{
+        ai2GroupedPct:Number(herd.groupedPct.toFixed(2)),
+        ai2MeanNeighbors:Number(herd.meanNeighbors.toFixed(2)),
+        ai2MaxLocalGroup:herd.maxLocalGroup,
+        ai2MeanNearest:Number(herd.meanNearest.toFixed(1))
+      }:{}),aiMeanGeneration:Number(meanGeneration.toFixed(3)),aiEscapeBias:Number(meanDangerSignal.toFixed(3)),aiOffspring:ai.offspring,aiMutated:ai.mutatedOffspring,aiFleeDays:Number(ai.fleeDays.toFixed(2)),
         aiFleeStarts:ai.fleeStarts,
         aiMeanFleeStartDistance:ai.fleeStarts?Number((ai.startDistanceSum/ai.fleeStarts).toFixed(2)):null,
         aiMeanTurnDeg:ai.turnSamples?Number((ai.turnDegSum/ai.turnSamples).toFixed(2)):null,
@@ -249,10 +257,10 @@
     particle(x,y,color,n=6){for(let i=0;i<n;i++)this.effects.push({x,y,vx:this.rand(-45,45),vy:this.rand(-45,45),life:this.rand(.25,.65),color})}
     die(a,reason,killer=null){
       if(!a.alive)return;
-      if(this.settings.mode==='escape'&&a.type==='g'&&a.aiEncounter)
+      if(this.settings.mode!=='normal'&&a.type==='g'&&a.aiEncounter)
         this.aiEncounterFinish(a,'diedOther');
       a.alive=false;this.stats.deaths[a.type][reason]++;
-      if(this.settings.mode==='escape'&&a.type==='r')this.aiChaseFinish(a,'other','red_died');
+      if(this.settings.mode!=='normal'&&a.type==='r')this.aiChaseFinish(a,'other','red_died');
       if(reason==='starve'){
         // Global grass alone cannot indicate whether an individual could reach food.
         if(this.grassTotal()>.5)this.stats.starveWithGlobalGrass[a.type]++;
@@ -303,6 +311,40 @@
       }
       return best;
     }
+    // Nearest-neighbour observations come from the SAME spatial buckets used by all species.
+    // No communication ability is granted other than what actual nearby green headings reveal.
+    socialContext(a,index,range=115){
+      const {cellSize,nx,ny,buckets}=index;
+      const minX=clamp(Math.floor((a.x-range)/cellSize),0,nx-1),maxX=clamp(Math.floor((a.x+range)/cellSize),0,nx-1);
+      const minY=clamp(Math.floor((a.y-range)/cellSize),0,ny-1),maxY=clamp(Math.floor((a.y+range)/cellSize),0,ny-1);
+      let count=0,cx=0,cy=0,ax=0,ay=0,sx=0,sy=0,nearest=range;
+      for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++)for(const b of buckets[y*nx+x]){
+        if(b===a||!b.alive||b.type!=='g')continue;
+        const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy);
+        if(dist>=range||dist<1e-5)continue;
+        count++;cx+=b.x;cy+=b.y;ax+=Math.cos(b.angle);ay+=Math.sin(b.angle);
+        nearest=Math.min(nearest,dist);
+        if(dist<38){sx-=dx/Math.max(dist,1);sy-=dy/Math.max(dist,1)}
+      }
+      const dir=Math.hypot(ax,ay),repel=Math.hypot(sx,sy);
+      return {count,cx:count?cx/count:a.x,cy:count?cy/count:a.y,
+        ax:dir?ax/dir:0,ay:dir?ay/dir:0,
+        sx:repel?sx/repel:0,sy:repel?sy/repel:0,nearest};
+    }
+    // Observable group: >=2 neighbours within 65 px. This is not a fitness reward.
+    herdSnapshot(){
+      const greens=this.entities.filter(e=>e.alive&&e.type==='g');
+      if(!greens.length)return {groupedPct:0,meanNeighbors:0,maxLocalGroup:0,meanNearest:0};
+      const index=this.buildIndex();let group=0,sum=0,max=1,near=0;
+      for(const e of greens){
+        const local=this.socialContext(e,index,65);
+        sum+=local.count;max=Math.max(max,local.count+1);
+        near+=local.nearest;
+        if(local.count>=2)group++;
+      }
+      return {groupedPct:100*group/greens.length,meanNeighbors:sum/greens.length,
+        maxLocalGroup:max,meanNearest:near/greens.length};
+    }
     update(dt=.05){
       if(this.day>=this.settings.duration)return;      dt=Math.min(dt,this.settings.duration-this.day);
       if(dt<=0)return;
@@ -326,7 +368,15 @@
           // When severely hungry, a herbivore takes a controlled risk to
           // graze unless the predator is already close. This prevents endless
           // long-range fleeing while accessible plants remain nearby.
-          const escapeAI=this.settings.mode==='escape';
+          const escapeAI=this.settings.mode!=='normal',socialAI=this.settings.mode==='social';
+          const social=socialAI&&this.settings.socialEnabled?this.socialContext(e,index):null;
+          const socialGenes=social?neuralForward(e.genome,[
+            clamp((social.cx-e.x)/115,-1,1),clamp((social.cy-e.y)/115,-1,1),
+            social.ax,social.ay,clamp(social.count/12,0,1),
+            clamp(social.nearest/115,0,1),e.energy/100,
+            this.grass[this.gridIndex(e.x,e.y)],
+            clamp((e.x-W/2)/(W/2),-1,1),clamp((e.y-H/2)/(H/2),-1,1)
+          ]):null;
           const dangerRange=(escapeAI?180:(e.energy<28?48:85))*e.view;
           const danger=this.nearest(e,index,dangerRange,'r');
           if(escapeAI)this.aiEncounterObserve(e,danger);
@@ -342,7 +392,9 @@
               clamp(e.hp/e.maxhp,0,1),clamp((e.x-W/2)/(W/2),-1,1),
               clamp((e.y-H/2)/(H/2),-1,1),this.grass[this.gridIndex(e.x,e.y)]
             ];
-            const [turn,offset,urge]=neuralForward(e.genome,inputs);
+            // AI② allocates the same 115 inherited weights to social decisions.
+            // Threat reflex stays fixed; AI① alone uses genome for escape tactics.
+            const [turn,offset,urge]=socialAI?[0,0,0]:neuralForward(e.genome,inputs);
             const hunger=(100-e.energy)/100;
             // The standard escape reflex provides a survivable founding policy.
             // The network evolves when to flee and which route/lateral dodge to take.
@@ -357,8 +409,15 @@
               const angleScale=policy==='guard'?.65:policy==='wide'?.65:1.05;
               const lateralScale=policy==='guard'?.30:policy==='wide'?.30:.55;
               const rotation=turn*angleScale,cos=Math.cos(rotation),sin=Math.sin(rotation);
-              const vx=dx*cos-dy*sin-dy*offset*lateralScale;
-              const vy=dx*sin+dy*cos+dx*offset*lateralScale;
+              let vx=dx*cos-dy*sin-dy*offset*lateralScale;
+              let vy=dx*sin+dy*cos+dx*offset*lateralScale;
+              if(socialGenes&&social.count){
+                // Group direction can help or obstruct escape. No extra speed or safety bonus.
+                const alignment=Math.max(0,.12+socialGenes[1]*1.8);
+                const len=Math.max(1,Math.hypot(vx,vy));
+                vx+=len*alignment*.30*social.ax;
+                vy+=len*alignment*.30*social.ay;
+              }
               const wasFleeing=!!e.aiFleeActive,priorHeading=e.angle,priorX=e.x,priorY=e.y;
               this.move(e,vx,vy,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');
               if(!wasFleeing&&threat.type==='r')this.aiFleeStarted(e,threat,distance,priorHeading,priorX,priorY);
@@ -377,7 +436,18 @@
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
             for(const [vx,vy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=clamp(cx+vx,0,GRID_X-1),ny=clamp(cy+vy,0,GRID_Y-1),n=this.grass[ny*GRID_X+nx];if(n>food+.18){food=n;tx=(nx+.5)*CELL;ty=(ny+.5)*CELL}}
             if(this.day>=e.turnAt){e.turnAt=this.day+this.rand(.22,.65);e.angle+=this.rand(-1.7,1.7)}
-            const dx=tx!==null?tx-e.x:Math.cos(e.angle),dy=ty!==null?ty-e.y:Math.sin(e.angle);
+            let dx=tx!==null?tx-e.x:Math.cos(e.angle),dy=ty!==null?ty-e.y:Math.sin(e.angle);
+            if(socialGenes&&social.count){
+              const length=Math.max(1e-5,Math.hypot(dx,dy));dx/=length;dy/=length;
+              // Heritable choices for cohesion, heading alignment, crowd separation.
+              // All can become zero: a herd is never forced or given a survival bonus.
+              const gather=Math.max(0,.16+socialGenes[0]*2.5);
+              const align=Math.max(0,.12+socialGenes[1]*2.0);
+              const spread=Math.max(0,.34+socialGenes[2]*2.2);
+              const cx=social.cx-e.x,cy=social.cy-e.y,d=Math.max(1,Math.hypot(cx,cy));
+              dx+=gather*cx/d+align*social.ax+spread*social.sx;
+              dy+=gather*cy/d+align*social.ay+spread*social.sy;
+            }
             this.move(e,dx,dy,dt,55*e.speed,0,'wander');
           }
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
@@ -388,7 +458,7 @@
           if(needsFood){
             if(e.targetId)target=this.entities.find(a=>a.id===e.targetId&&a.alive&&a.type==='g');
             if(target&&Math.hypot(e.x-target.x,e.y-target.y)>200*e.view){
-              if(this.settings.mode==='escape'&&e.type==='r')this.aiChaseFinish(e,'escaped','distance_exceeded');
+              if(this.settings.mode!=='normal'&&e.type==='r')this.aiChaseFinish(e,'escaped','distance_exceeded');
               target=null;
             }
             if(!target&&e.aiChase)this.aiChaseFinish(e,'other','target_missing');
@@ -425,7 +495,7 @@
         const fertility=e.type==='g'?clamp((foodAvailability-.05)/.38,.05,1):1;
         if(canBirth && this.rnd()<dt*t.birthRate*fertility && this.entities.length+newborn.length<MAX_POP){
           e.energy-=t.birthCost;e.lastBirth=this.day;e.children++;
-          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),parent:this.settings.mode==='escape'&&e.type==='g'?e:null});this.stats.births[e.type]++;
+          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),parent:this.settings.mode!=='normal'&&e.type==='g'?e:null});this.stats.births[e.type]++;
           if(e.type!=='g'&&this.stats.births[e.type]===1)this.record('birth', (e.type==='r'?'赤':'青')+'の捕食者が初めて繁殖');
         }
         e.phase+=dt*10;e.flash=Math.max(0,e.flash-dt);
