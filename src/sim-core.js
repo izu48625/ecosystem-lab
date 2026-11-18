@@ -63,6 +63,8 @@
           // Observational telemetry only: no changes to movement, predators, or PRNG.
           fleeStarts:0,startDistanceSum:0,turnSamples:0,turnDegSum:0,awayDegSum:0,
           chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0,
+          // One-day, attack-free survival after a red comes within 120px.
+          encounterStarts:0,encounterSurvived:0,encounterHit:0,encounterDiedOther:0,
           byGeneration:{},escapeEvents:[],eventsDropped:0}};
       for(const [k,count] of [['g',this.settings.green],['r',this.settings.red],['b',this.settings.blue]]) for(let i=0;i<count;i++) this.spawn(k,this.rand(24,W-24),this.rand(24,H-24),true);
       this.record('start',this.settings.mode==='escape'?'AI①：緑の逃走判断を遺伝・突然変異させる実験を開始':'緑・赤の生物を投入');this.snapshot(0);
@@ -86,7 +88,8 @@
       const ai=this.stats.ai,key=String(generation);
       if(!ai.byGeneration[key])ai.byGeneration[key]={
         born:0,fleeStarts:0,startDistanceSum:0,turnSamples:0,turnDegSum:0,awayDegSum:0,
-        chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0
+        chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0,
+        encounterStarts:0,encounterSurvived:0,encounterHit:0,encounterDiedOther:0
       };
       return ai.byGeneration[key];
     }
@@ -145,6 +148,58 @@
       });
       red.aiChase=null;
     }
+    aiEncounterFinish(green,outcome){
+      const episode=green.aiEncounter;
+      if(!episode)return;
+      const ai=this.stats.ai,group=this.aiGeneration(green.generation);
+      const field={survived:'encounterSurvived',hit:'encounterHit',diedOther:'encounterDiedOther'}[outcome];
+      if(!field)throw new Error('Unknown encounter result: '+outcome);
+      ai[field]++;group[field]++;
+      this.aiLog({
+        day:Number(this.day.toFixed(3)),kind:'red_proximity_end',
+        greenId:green.id,generation:green.generation,redId:episode.redId,
+        startDay:Number(episode.startDay.toFixed(3)),
+        startDistance:Number(episode.startDistance.toFixed(2)),
+        startEnergy:Number(episode.startEnergy.toFixed(2)),
+        outcome,windowDays:1
+      });
+      green.aiEncounter=null;
+    }
+    aiEncounterStart(green,red,distance){
+      if(this.settings.mode!=='escape'||green.type!=='g'||red.type!=='r')return;
+      const ai=this.stats.ai,group=this.aiGeneration(green.generation);
+      green.aiEncounter={
+        startDay:this.day,redId:red.id,startDistance:distance,startEnergy:green.energy
+      };
+      green.aiThreatNear=true;
+      ai.encounterStarts++;group.encounterStarts++;
+      this.aiLog({
+        day:Number(this.day.toFixed(3)),kind:'red_proximity_start',
+        greenId:green.id,generation:green.generation,redId:red.id,
+        startDistance:Number(distance.toFixed(2)),startEnergy:Number(green.energy.toFixed(2)),
+        windowDays:1
+      });
+    }
+    aiEncounterObserve(green,red){
+      if(this.settings.mode!=='escape')return;
+      const active=green.aiEncounter;
+      if(active&&this.day-active.startDay>=1-1e-8)this.aiEncounterFinish(green,'survived');
+      const distance=red?Math.hypot(green.x-red.x,green.y-red.y):Infinity;
+      const near=distance<=120;
+      // One event per contiguous near-red interval; do not count each tick.
+      if(!near)green.aiThreatNear=false;
+      if(near&&!green.aiThreatNear&&!green.aiEncounter){
+        this.aiEncounterStart(green,red,distance);
+      }
+    }
+    aiEncounterHit(green,red){
+      if(this.settings.mode!=='escape'||red.type!=='r'||green.type!=='g')return;
+      // If an attack occurs before this green's update, do not miss the exposure.
+      if(!green.aiEncounter && !green.aiThreatNear){
+        this.aiEncounterStart(green,red,Math.hypot(green.x-red.x,green.y-red.y));
+      }
+      if(green.aiEncounter)this.aiEncounterFinish(green,'hit');
+    }
     spawn(type,x,y,initial=false,parent=null){
       const t=SPECIES[type], variation=()=>1+this.rand(-this.settings.variance,this.settings.variance);
       const temperament= type==='g'?(this.rnd()<.25?'timid':this.rnd()<.333?'brave':'normal'):(this.rnd()<.5?'bold':'careful');
@@ -178,12 +233,21 @@
         aiMeanAwayDeg:ai.turnSamples?Number((ai.awayDegSum/ai.turnSamples).toFixed(2)):null,
         aiChaseStarts:ai.chaseStarts,aiChaseEscaped:ai.chaseEscaped,aiChaseCaught:ai.chaseCaught,
         aiChaseOther:ai.chaseOther,
+        aiEncounterStarts:ai.encounterStarts,
+        aiEncounterSurvived:ai.encounterSurvived,
+        aiEncounterHit:ai.encounterHit,
+        aiEncounterDiedOther:ai.encounterDiedOther,
+        aiEncounterPending:ai.encounterStarts-ai.encounterSurvived-ai.encounterHit-ai.encounterDiedOther,
+        aiAttackFree1dPct:(ai.encounterSurvived+ai.encounterHit+ai.encounterDiedOther)?
+          Number((100*ai.encounterSurvived/(ai.encounterSurvived+ai.encounterHit+ai.encounterDiedOther)).toFixed(2)):null,
         aiChaseDistanceBreakPct:(ai.chaseEscaped+ai.chaseCaught)?Number((100*ai.chaseEscaped/(ai.chaseEscaped+ai.chaseCaught)).toFixed(2)):null,
         grass:this.grassTotal(),birthg:this.stats.births.g,birthr:this.stats.births.r,birthb:this.stats.births.b,killsr:this.stats.kills.r,killsb:this.stats.kills.b,huntsr:this.stats.hunts.r,huntsb:this.stats.hunts.b,starveg:this.stats.deaths.g.starve,starver:this.stats.deaths.r.starve,starveb:this.stats.deaths.b.starve,ager:this.stats.deaths.r.age,ageb:this.stats.deaths.b.age,counters:this.stats.counters,
         daysr:this.stats.individualDays.r,daysb:this.stats.individualDays.b,edger:this.stats.edgeDays.r,edgeb:this.stats.edgeDays.b,starvegrassg:this.stats.starveWithGlobalGrass.g})}
     particle(x,y,color,n=6){for(let i=0;i<n;i++)this.effects.push({x,y,vx:this.rand(-45,45),vy:this.rand(-45,45),life:this.rand(.25,.65),color})}
     die(a,reason,killer=null){
       if(!a.alive)return;
+      if(this.settings.mode==='escape'&&a.type==='g'&&a.aiEncounter)
+        this.aiEncounterFinish(a,'diedOther');
       a.alive=false;this.stats.deaths[a.type][reason]++;
       if(this.settings.mode==='escape'&&a.type==='r')this.aiChaseFinish(a,'other','red_died');
       if(reason==='starve'){
@@ -262,6 +326,7 @@
           const escapeAI=this.settings.mode==='escape';
           const dangerRange=(escapeAI?180:(e.energy<28?48:85))*e.view;
           const danger=this.nearest(e,index,dangerRange,'r');
+          if(escapeAI)this.aiEncounterObserve(e,danger);
           const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
           let fleeing=false;
@@ -324,6 +389,7 @@
             this.move(e,target.x-e.x,target.y-e.y,dt,(e.type==='r'?165:145)*e.speed,15);
             const dist=Math.hypot(target.x-e.x,target.y-e.y);
             if(dist<20 && this.day-e.lastAttack>=t.attackCooldown){
+              if(e.type==='r')this.aiEncounterHit(target,e);
               e.lastAttack=this.day;target.hp-=e.attack;target.flash=.28;this.stats.strikes[e.type]++;this.particle(target.x,target.y,e.type==='r'?'#ffc38c':'#b1d7ff',3);
               if(target.alive && target.hp>0 && this.day-target.lastCounter>.42){
                 const counterChance=target.temperament==='brave'?.3:target.temperament==='timid'?.15:.2;
