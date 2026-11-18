@@ -133,6 +133,76 @@ function testGentlerMutation(){
  assert.equal(lab.stats.ai.mutatedGenes,mutated);
  console.log('✓ AI①遺伝子の変異は確率2%、最大±0.10である');
 }
+function testEscapeBehaviorTelemetry(){
+ const input={seed:20261117,green:100,red:20,blue:0,regrowth:100,variance:10,mode:'escape',duration:100};
+ const lab=new Lab(input);
+ lab.run(100,.08);
+ // Stored 100-seed validation from before telemetry was implemented:
+ // proves these measurement hooks do not change actual simulated outcomes.
+ const n=lab.counts(),st=lab.stats,ai=st.ai;
+ assert.equal(n.g,14);
+ assert.equal(n.r,1);
+ assert.equal(st.births.g,706);
+ assert.equal(st.births.r,108);
+ assert.equal(st.deaths.g.hunt,473);
+ assert.equal(st.deaths.g.starve,225);
+ assert.ok(ai.fleeStarts>0,'Flee starts should be recorded');
+ assert.ok(ai.turnSamples>0,'Actual motion turning angles should be observed');
+ assert.ok(ai.startDistanceSum>0);
+ assert.ok(ai.turnDegSum>=0&&ai.turnDegSum<=ai.turnSamples*180+1e-6);
+ assert.ok(ai.awayDegSum>=0&&ai.awayDegSum<=ai.turnSamples*180+1e-6);
+ assert.ok(ai.chaseStarts>0,'Red tracking episode starts should be measured');
+ assert.ok(ai.chaseCaught>0,'Red-caused captured prey should be recorded');
+ assert.ok(ai.chaseEscaped>=0&&ai.chaseEscaped+ai.chaseCaught+ai.chaseOther<=ai.chaseStarts);
+ const groups=Object.values(ai.byGeneration),sum=key=>groups.reduce((n,g)=>n+g[key],0);
+ assert.equal(sum('fleeStarts'),ai.fleeStarts);
+ assert.equal(sum('turnSamples'),ai.turnSamples);
+ assert.equal(sum('chaseStarts'),ai.chaseStarts);
+ assert.equal(sum('chaseEscaped'),ai.chaseEscaped);
+ assert.equal(sum('chaseCaught'),ai.chaseCaught);
+ assert.equal(sum('chaseOther'),ai.chaseOther);
+ assert.equal(ai.escapeEvents.length+ai.eventsDropped,
+   ai.fleeStarts+ai.chaseEscaped+ai.chaseCaught);
+ for(const event of ai.escapeEvents){
+   assert.ok(event.generation>=0&&event.day>0&&event.day<=100);
+   if(event.kind==='flee_start'){
+     assert.ok(event.startDistance>0&&event.startDistance<300);
+     if(event.turnDeg!==null){
+       assert.ok(event.turnDeg>=0&&event.turnDeg<=180);
+       assert.ok(event.awayDeg>=0&&event.awayDeg<=180);
+     }
+   }else{
+     assert.equal(event.kind,'chase_end');
+     assert.ok(['escaped','caught'].includes(event.outcome));
+   }
+ }
+ const end=lab.history.at(-1);
+ assert.equal(end.aiFleeStarts,ai.fleeStarts);
+ assert.equal(end.aiChaseStarts,ai.chaseStarts);
+ assert.equal(end.aiChaseEscaped,ai.chaseEscaped);
+ assert.ok(Math.abs(end.aiMeanFleeStartDistance-ai.startDistanceSum/ai.fleeStarts)<.011);
+ const normal=new Lab({...input,mode:'normal'});normal.run(100,.08);
+ assert.equal(normal.stats.ai.fleeStarts,0);
+ assert.equal(normal.stats.ai.chaseStarts,0);
+ assert.equal(normal.history.at(-1).aiMeanFleeStartDistance,null);
+ console.log('✓ 逃走開始距離・方向転換・追跡終了を世代別と日別に正しく記録（旧結果一致）');
+ console.log('  観測：',JSON.stringify({fleeStarts:ai.fleeStarts,chases:ai.chaseStarts,breaks:ai.chaseEscaped,caught:ai.chaseCaught,other:ai.chaseOther}));
+}
+function testDistanceBreakClassification(){
+ const lab=new Lab({seed:424242,green:1,red:1,blue:0,mode:'escape',duration:5});
+ const green=lab.entities.find(e=>e.type==='g'),red=lab.entities.find(e=>e.type==='r');
+ green.x=150;green.y=60;red.x=55;red.y=60;
+ red.energy=30;red.view=1;red.age=7;red.life=80;
+ green.life=80;green.energy=90;
+ lab.update(.08);
+ assert.equal(lab.stats.ai.chaseStarts,1,'Hungry red should acquire nearby green');
+ green.x=900;green.y=500;
+ lab.update(.08);
+ assert.equal(lab.stats.ai.chaseEscaped,1,'Red drops target only after it leaves its 200×view pursuit range');
+ assert.equal(lab.stats.ai.chaseCaught,0);
+ assert.equal(lab.stats.ai.chaseOther,0);
+ console.log('✓ 追跡解除の理由（距離離脱）を実際の赤の追跡ロジックから観測');
+}
 function testUnchangedRedRules(){
  const input={seed:424242,green:0,red:10,blue:0,variance:10,regrowth:100,duration:40};
  const n=new Lab({...input,mode:'normal'});
@@ -148,4 +218,6 @@ function testUnchangedRedRules(){
 testLastChanceMeal();testWalls();
 testNeuroevolution();
 testGentlerMutation();
+testEscapeBehaviorTelemetry();
+testDistanceBreakClassification();
 testUnchangedRedRules();
