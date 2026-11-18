@@ -53,7 +53,7 @@
         mode:settings.mode==='escape'?'escape':'normal',
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         // Study-only AI1 forage strategies; baseline remains the default until validated.
-        foragePolicy:['route','adaptive'].includes(settings.foragePolicy)?settings.foragePolicy:'baseline',
+        foragePolicy:['route','adaptive','graze','grazeRoute'].includes(settings.foragePolicy)?settings.foragePolicy:'baseline',
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
@@ -334,7 +334,7 @@
           if(escapeAI)this.aiEncounterObserve(e,danger);
           const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
-          const forageAI=escapeAI&&this.settings.foragePolicy!=='baseline';
+          const forageAI=escapeAI&&['route','adaptive','grazeRoute'].includes(this.settings.foragePolicy);
           let fleeing=false;
           if(threat&&escapeAI){
             const distance=Math.max(.01,Math.hypot(e.x-threat.x,e.y-threat.y));
@@ -397,8 +397,13 @@
               for(const [vx,vy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=clamp(cx+vx,0,GRID_X-1),ny=clamp(cy+vy,0,GRID_Y-1),n=this.grass[ny*GRID_X+nx];if(n>food+.18){food=n;tx=(nx+.5)*CELL;ty=(ny+.5)*CELL}}
             }
             if(this.day>=e.turnAt){e.turnAt=this.day+this.rand(.22,.65);e.angle+=this.rand(-1.7,1.7)}
-            const dx=tx!==null?tx-e.x:Math.cos(e.angle),dy=ty!==null?ty-e.y:Math.sin(e.angle);
-            this.move(e,dx,dy,dt,55*e.speed,0,'wander');
+            // When unthreatened and hungry, stay on a grassy cell long enough to eat.
+            // Only green AI1 in the designated experimental arms uses this behavior.
+            const canPause=escapeAI&&['graze','grazeRoute'].includes(this.settings.foragePolicy)&&e.energy<60&&this.grass[gi]>.20;
+            if(!canPause){
+              const dx=tx!==null?tx-e.x:Math.cos(e.angle),dy=ty!==null?ty-e.y:Math.sin(e.angle);
+              this.move(e,dx,dy,dt,55*e.speed,0,'wander');
+            }
           }
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
           if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
