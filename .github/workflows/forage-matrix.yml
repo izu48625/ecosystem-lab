@@ -1,0 +1,61 @@
+name: AI1 foraging parallel verification
+on:
+  push:
+    branches:
+      - experiment/ai1-foraging-20261119-v1
+    paths:
+      - '.github/workflows/forage-matrix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "${{ matrix.set }}-${{ matrix.offset }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {set: discovery, offset: 0, base: 20270001}
+          - {set: discovery, offset: 25, base: 20270001}
+          - {set: discovery, offset: 50, base: 20270001}
+          - {set: discovery, offset: 75, base: 20270001}
+          - {set: holdout, offset: 0, base: 20281001}
+          - {set: holdout, offset: 25, base: 20281001}
+          - {set: holdout, offset: 50, base: 20281001}
+          - {set: holdout, offset: 75, base: 20281001}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compute one independent shard
+        run: |
+          mkdir -p benchmark-shards
+          node tests/forage-policy-study.js ${{ matrix.offset }} 25 ${{ matrix.base }} baseline,safeSearch,route,adaptive,graze,grazeRoute > benchmark-shards/${{ matrix.set }}-${{ matrix.offset }}.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.set }}-${{ matrix.offset }}
+          path: benchmark-shards/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shard-*
+          path: benchmark-shards
+          merge-multiple: true
+      - name: Select on discovery and inspect untouched holdout
+        run: node tests/forage-matrix-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-forage-matrix-final
+          path: reports/forage-benchmark-output/
+          if-no-files-found: error
