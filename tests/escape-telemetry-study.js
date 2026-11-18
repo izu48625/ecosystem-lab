@@ -8,7 +8,7 @@
  */
 const assert=require('node:assert/strict');
 const {Lab,SPECIES,ESCAPE_MUTATION}=require('../src/sim-core.js');
-const offset=Number(process.argv[2]??0),count=Number(process.argv[3]??25);
+const offset=Number(process.argv[2]??0),count=Number(process.argv[3]??25),control=process.argv[4]==='clone'?'clone':'evolve';
 assert.ok(Number.isInteger(offset)&&offset>=0&&Number.isInteger(count)&&count>=1&&count<=100);
 const settings={green:100,red:20,blue:0,variance:10,regrowth:100,duration:100,mode:'escape'};
 const groups=['gen0','gen1_2','gen3_5','gen6_9','gen10plus'];
@@ -17,6 +17,17 @@ const zero=()=>({born:0,fleeStarts:0,startDistanceSum:0,turnSamples:0,turnDegSum
 const total=Object.fromEntries(groups.map(x=>[x,zero()])),samples=[];
 for(let i=0;i<count;i++){
   const seed=20261117+offset+i,lab=new Lab({...settings,seed});
+  if(control==='clone'){
+    const inherited=lab.mutateBrain;
+    lab.mutateBrain=function(parent){
+      const oldMutationCount=this.stats.ai.mutatedOffspring,oldGeneCount=this.stats.ai.mutatedGenes;
+      // Consume exactly the same mutation RNG as the evolving condition.
+      inherited.call(this,parent);
+      this.stats.ai.mutatedOffspring=oldMutationCount;
+      this.stats.ai.mutatedGenes=oldGeneCount;
+      return parent.genome.slice();
+    };
+  }
   lab.run(100,.08);
   const a=lab.stats.ai,n=lab.counts(),by=Object.fromEntries(groups.map(x=>[x,zero()]));
   for(const [k,v] of Object.entries(a.byGeneration)){
@@ -44,5 +55,5 @@ for(let i=0;i<count;i++){
 }
 for(const group of groups)for(const field of ['startDistanceSum','turnDegSum','awayDegSum'])total[group][field]=Number(total[group][field].toFixed(7));
 console.log('ESCAPE_TELEMETRY_STUDY_BEGIN');
-console.log(JSON.stringify({offset,count,seedFirst:samples[0].seed,seedLast:samples.at(-1).seed,settings,redRules:SPECIES.r,mutation:ESCAPE_MUTATION,groups,aggregates:total,samples}));
+console.log(JSON.stringify({control,offset,count,seedFirst:samples[0].seed,seedLast:samples.at(-1).seed,settings,redRules:SPECIES.r,mutation:ESCAPE_MUTATION,groups,aggregates:total,samples}));
 console.log('ESCAPE_TELEMETRY_STUDY_END');
