@@ -5,9 +5,9 @@ const $=id=>document.getElementById(id), {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL}=wi
 const cv=$('world'),c=cv.getContext('2d'),pop=$('chart'),popCtx=pop.getContext('2d'),pred=$('predChart'),predCtx=pred.getContext('2d');
 const CHECKPOINT_DAY=100;
 let lab,playing=true,ended=false,checkpointPassed=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0,activeTab='normal';
-const worlds={normal:null,ai1:null};
+const worlds={normal:null,ai1:null,ai2:null};
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value),duration:Infinity,mode:activeTab==='ai1'?'escape':'normal'}}
+function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value),duration:Infinity,mode:activeTab==='ai1'?'escape':activeTab==='ai2'?'social':'normal'}}
 function reset(){lab=new Lab(options());playing=true;ended=false;checkpointPassed=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};show();draw();drawCharts()}
 function creature(e){
  c.save();c.translate(e.x,e.y);c.rotate(e.angle);const sz=e.type==='g'?.88:e.type==='r'?1.08:1.22;c.scale(sz,sz);
@@ -79,6 +79,11 @@ function show(){
  $('selected').textContent=sel?`#${sel.id}｜${SPECIES[sel.type].name}\nHP ${Math.ceil(sel.hp)}/${Math.ceil(sel.maxhp)}｜エネルギー ${Math.ceil(sel.energy)}%｜年齢 ${sel.age.toFixed(1)}/${sel.life.toFixed(1)}日｜攻撃力 ${sel.attack.toFixed(1)}｜移動 ${sel.speed.toFixed(2)}｜捕食 ${sel.kills}｜子 ${sel.children}｜反撃 ${sel.counters}`:'生物をタップすると、HP・年齢・エネルギー・個体記録を表示します。';
  $('toggle').textContent=ended?'✓ 実験終了':playing?'⏸ 一時停止':checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'▶ 100日以降を再生':'▶ 再開';$('toggle').disabled=ended;
  $('stateText').textContent=playing?'シミュレーション実行中':checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'DAY100｜▶で続きを再生':'一時停止中';
+ const herd=lab.history.at(-1);
+ $('ai2Grouped').textContent=activeTab==='ai2'&&herd&&herd.ai2GroupedPct!==undefined?herd.ai2GroupedPct.toFixed(1)+'%':'—';
+ $('ai2Neighbors').textContent=activeTab==='ai2'&&herd&&herd.ai2MeanNeighbors!==undefined?herd.ai2MeanNeighbors.toFixed(2):'—';
+ $('ai2Cluster').textContent=activeTab==='ai2'&&herd?String(herd.ai2MaxLocalGroup??0):'—';
+ $('ai2Generation').textContent=activeTab==='ai2'&&herd?Number(herd.aiMeanGeneration||0).toFixed(1):'—';
 
 }
 let last=0;
@@ -99,14 +104,15 @@ function frame(t){
      if(!checkpointPassed&&lab.day>=CHECKPOINT_DAY-1e-9){pauseAtCheckpoint();break}
    }
  }
- if(activeTab!=='ai2'){draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}}requestAnimationFrame(frame)
+ draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}requestAnimationFrame(frame)
 }
 function exportCSV(){
  const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg','aiMeanGeneration','aiEscapeBias','aiOffspring','aiMutated','aiFleeDays',
   'aiFleeStarts','aiMeanFleeStartDistance','aiMeanTurnDeg','aiMeanAwayDeg',
   'aiChaseStarts','aiChaseEscaped','aiChaseCaught','aiChaseOther','aiChaseDistanceBreakPct',
   'aiEncounterStarts','aiEncounterSurvived','aiEncounterHit','aiEncounterDiedOther',
-  'aiEncounterPending','aiAttackFree1dPct'];
+  'aiEncounterPending','aiAttackFree1dPct',
+  'ai2GroupedPct','ai2MeanNeighbors','ai2MaxLocalGroup','ai2MeanNearest'];
  const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]??'').join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ecosystem_${lab.settings.mode}_seed_${lab.settings.seed}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
 } 
@@ -131,19 +137,13 @@ function snapshotWorld(){
 }
 function switchTab(next){
  if(next===activeTab)return;
- if(activeTab!=='ai2')snapshotWorld();
+ snapshotWorld();
  activeTab=next;
  for(const [key,view,button] of [['normal','view-normal','tabButtonNormal'],['ai1','view-ai1','tabButtonAi1'],['ai2','view-ai2','tabButtonAi2']]){
    $(view).hidden=key!==next;$(button).setAttribute('aria-selected',String(key===next));
  }
- $('view-live').hidden=next==='ai2';
+ $('view-live').hidden=false;
  $('escapeCsv').hidden=next!=='ai1';
- if(next==='ai2'){
-   playing=false;
-   $('stateText').textContent='AI②は設計中';
-   $('dot').style.background='#8baaa4';
-   return;
- }
  if(worlds[next]){
    const w=worlds[next];
    ({lab,playing,checkpointPassed,ended,speed,focus,zoom,cam,accum}=w);
@@ -183,7 +183,6 @@ $('jump100').onclick=()=>advanceTo(lab.day+100);
 $('csv').onclick=exportCSV;
 $('escapeCsv').onclick=exportEscapeCSV;
 $('openReport').onclick=()=>{
- if(activeTab==='ai2')return;
  playing=false;accum=0;show();
  window.EcosystemReport.render(lab);
 };
@@ -200,7 +199,7 @@ $('batch').onclick=async()=>{
  if($('batch').disabled)return;
  const btn=$('batch'),wasPlaying=playing;
  playing=false;btn.disabled=true;
- const pref=options(),modes=['normal','escape'],results={};
+ const pref=options(),modes=['normal','escape','social'],results={};
  for(const mode of modes)results[mode]={greenAlive:0,coexist:0,finalGreen:0,finalRed:0,hunted:0,starved:0};
  try{
   for(let i=0;i<10;i++){
@@ -217,19 +216,19 @@ $('batch').onclick=async()=>{
     out.hunted+=test.stats.deaths.g.hunt;
     out.starved+=test.stats.deaths.g.starve;
    }
-   $('batchResult').textContent=`ノーマルとAI①を同じ10シードで比較中… ${i+1}/10回`;
+   $('batchResult').textContent=`ノーマル・AI①・AI②を同じ10シードで比較中… ${i+1}/10回`;
    await new Promise(resolve=>setTimeout(resolve,0));
   }
-  const n=results.normal,a=results.escape;
+  const n=results.normal,a=results.escape,h=results.social;
   const avg=v=>(v/10).toFixed(1);
   $('batchResult').textContent=
    `同じ10シード・各100日（参考値）\n`+
-   `緑がDAY100まで存続：ノーマル ${n.greenAlive}/10 ／ AI① ${a.greenAlive}/10\n`+
-   `赤緑の共存：ノーマル ${n.coexist}/10 ／ AI① ${a.coexist}/10\n`+
-   `緑の最終平均：ノーマル ${avg(n.finalGreen)}匹 ／ AI① ${avg(a.finalGreen)}匹\n`+
-   `緑の平均捕食死：ノーマル ${avg(n.hunted)}件 ／ AI① ${avg(a.hunted)}件\n`+
-   `緑の平均餓死：ノーマル ${avg(n.starved)}件 ／ AI① ${avg(a.starved)}件\n`+
-   `※10回は例示用。結果はシードや設定で変わります。世代交代による進化効果と手動の逃走ルール改善は別です。`;
+   `緑がDAY100まで存続：ノーマル ${n.greenAlive}/10 ／ AI① ${a.greenAlive}/10 ／ AI② ${h.greenAlive}/10\n`+
+   `赤緑の共存：ノーマル ${n.coexist}/10 ／ AI① ${a.coexist}/10 ／ AI② ${h.coexist}/10\n`+
+   `緑の最終平均：ノーマル ${avg(n.finalGreen)}匹 ／ AI① ${avg(a.finalGreen)}匹 ／ AI② ${avg(h.finalGreen)}匹\n`+
+   `緑の平均捕食死：ノーマル ${avg(n.hunted)}件 ／ AI① ${avg(a.hunted)}件 ／ AI② ${avg(h.hunted)}件\n`+
+   `緑の平均餓死：ノーマル ${avg(n.starved)}件 ／ AI① ${avg(a.starved)}件 ／ AI② ${avg(h.starved)}件\n`+
+   `※10回は動作確認用の参考値です。群れの形成や逃走能力が世代とともに向上した証拠ではありません。`;
  }catch(error){
   $('batchResult').textContent='比較中に問題が発生しました。設定を確認してください。';
   console.error('Paired survival batch failed',error);
