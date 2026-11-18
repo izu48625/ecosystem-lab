@@ -1,0 +1,29 @@
+name: AI1 branch regression and deterministic safety
+on:
+  push:
+    branches:
+      - experiment/ai1-survival-balanced-20261119
+    paths:
+      - '.github/workflows/ai1-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Core deterministic smoke including genetic inheritance and red rules
+        run: node tests/smoke.test.js
+      - name: Browser wiring smoke
+        run: node tests/ui-smoke.js
+      - name: Mixed predator regression
+        run: node tests/montecarlo.js 5
+      - name: Red count sensitivity regression
+        run: node tests/predator-balance.js 3
+      - name: Baseline Normal vs AI1 paired regression
+        run: node tests/escape-comparison.js 4
