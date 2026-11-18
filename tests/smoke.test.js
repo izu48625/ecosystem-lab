@@ -134,7 +134,7 @@ function testGentlerMutation(){
  console.log('✓ AI①遺伝子の変異は確率2%、最大±0.10である');
 }
 function testEscapeBehaviorTelemetry(){
- const input={seed:20261117,green:100,red:20,blue:0,regrowth:100,variance:10,mode:'escape',duration:100};
+ const input={seed:20261117,green:100,red:20,blue:0,regrowth:100,variance:10,mode:'escape',escapePolicy:'baseline',duration:100};
  const lab=new Lab(input);
  lab.run(100,.08);
  // Stored 100-seed validation from before telemetry was implemented:
@@ -215,7 +215,7 @@ function testDistanceBreakClassification(){
  console.log('✓ 追跡解除の理由（距離離脱）を実際の赤の追跡ロジックから観測');
 }
 function testAttackFreeExposure(){
- const options={seed:20261117,green:100,red:20,blue:0,mode:'escape',variance:10,regrowth:100,duration:100};
+ const options={seed:20261117,green:100,red:20,blue:0,mode:'escape',escapePolicy:'baseline',variance:10,regrowth:100,duration:100};
  const lab=new Lab(options);
  lab.run(100,.08);
  // Previous pre-telemetry deterministic study (AI1 2% ±0.10):
