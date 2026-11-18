@@ -21,3 +21,19 @@ jobs:
         run: node tests/predator-balance.js 3
       - name: Sample paired Normal vs AI escape evolution
         run: node tests/escape-comparison.js 4
+
+  compare_100:
+    name: Paired 100-day study seeds ${{ matrix.offset }}–${{ matrix.offset + 24 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        offset: [0, 25, 50, 75]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 25 matched seeds / 100 fictional days / 2 conditions
+        run: node tests/escape-study-100.js ${{ matrix.offset }} 25
