@@ -9,13 +9,16 @@ const offset=Number(process.argv[2]??0),count=Number(process.argv[3]??25);
 const seedBase=Number(process.argv[4]??20261117);
 assert.ok(Number.isInteger(offset)&&offset>=0&&Number.isInteger(count)&&count>=1&&count<=100&&Number.isInteger(seedBase)&&seedBase>=1);
 const settings={green:100,red:20,blue:0,regrowth:100,variance:10,duration:100,mode:'escape'};
-const cases=[
+const allCases=[
  {key:'baseline',p:.08,amp:.34},
  {key:'p04_a034',p:.04,amp:.34},
  {key:'p08_a017',p:.08,amp:.17},
  {key:'p04_a017',p:.04,amp:.17},
  {key:'p02_a010',p:.02,amp:.10}
 ];
+const requested=(process.argv[5]||'').split(',').filter(Boolean);
+const cases=requested.length?allCases.filter(c=>requested.includes(c.key)):allCases;
+assert.ok(cases.length>0 && (!requested.length || cases.length===requested.length),'Valid mutation case names required');
 function withMutation(lab,c){
   if(c.key==='baseline')return;
   lab.mutateBrain=function(parent){
