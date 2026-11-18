@@ -53,7 +53,7 @@
         mode:settings.mode==='escape'?'escape':'normal',
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         // Study-only AI1 forage strategies; baseline remains the default until validated.
-        foragePolicy:['route','adaptive','graze','grazeRoute'].includes(settings.foragePolicy)?settings.foragePolicy:'baseline',
+        foragePolicy:['route','adaptive','graze','grazeRoute','safeSearch'].includes(settings.foragePolicy)?settings.foragePolicy:'baseline',
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
         // Default stays at 100 days for batch studies; the live UI opts into unlimited days.
@@ -334,7 +334,7 @@
           if(escapeAI)this.aiEncounterObserve(e,danger);
           const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
-          const forageAI=escapeAI&&['route','adaptive','grazeRoute'].includes(this.settings.foragePolicy);
+          const forageAI=escapeAI&&['route','adaptive','grazeRoute','safeSearch'].includes(this.settings.foragePolicy);
           let fleeing=false;
           if(threat&&escapeAI){
             const distance=Math.max(.01,Math.hypot(e.x-threat.x,e.y-threat.y));
@@ -382,7 +382,9 @@
             if(escapeAI)e.aiFleeActive=false;
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
             const cx=clamp(Math.floor(e.x/CELL),0,GRID_X-1),cy=clamp(Math.floor(e.y/CELL),0,GRID_Y-1);
-            if(forageAI&&e.energy<65){
+            // The safest candidate only searches further when no red is within 250px.
+            const forageSearchSafe=this.settings.foragePolicy!=='safeSearch'||(!threat&&!this.nearest(e,index,250,'r'));
+            if(forageAI&&e.energy<65&&forageSearchSafe){
               // Search up to two cells away for grass; avoid routes toward a visible predator.
               let score=food;
               for(let oy=-2;oy<=2;oy++)for(let ox=-2;ox<=2;ox++){
