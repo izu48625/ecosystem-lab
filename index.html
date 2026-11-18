@@ -180,6 +180,7 @@
           <tbody id="reportGenerationRows"></tbody>
         </table>
         <div class="reportTacticsFoot">距離＝画面座標。角度＝移動前後の進行方向差。追跡距離離脱＝赤が対象を追跡中に200×視野の距離を超えて解除した場合。離脱率＝距離離脱÷（距離離脱＋その赤による捕食）。ほかの終了・追跡継続中は除外。</div>
+        <div class="reportTacticsFoot" id="reportLogInfo">個別ログ0件／最大20,000件・集計は全件</div>
       </div>
       <div class="reportExplain">
         <div class="reportExplainTitle">🧠 何を・どう学習させている？ <span id="reportMode">AI① 逃走進化</span></div>
@@ -187,7 +188,7 @@
         <div id="reportOutputs"><b>判断：</b>逃げるタイミング・逃走方向・左右への回避</div>
         <div id="reportGenetics"><b>進化：</b>10入力→8神経→3出力／115重みを親から遺伝、重み単位2%で最大±0.10の突然変異。生存・繁殖による自然選択（個体内の経験学習なし）</div>
       </div>
-      <div class="reportFoot">* 捕食成功率＝累計捕食数÷追跡開始件数。距離離脱は追跡解除の記録で、長期生存や進化の有利さを直接証明するものではありません。個体絶滅後の平均世代は使わず、観察期間中の最高値を表示。逃走の個別ログは最大3,000件、集計は全件。</div>
+      <div class="reportFoot">* 捕食成功率＝累計捕食数÷追跡開始件数。距離離脱は追跡解除の記録で、長期生存や進化の有利さを直接証明するものではありません。個体絶滅後の平均世代は使わず、観察期間中の最高値を表示。逃走の個別ログは最大20,000件、集計は全件。</div>
     </div>
     <div class="reportActions"><button id="reportSavePng" class="primary">↓ 1枚の画像で保存（PNG）</button><button id="reportGenerationCsv" class="reportAiOnly">↓ 世代別CSV</button><button id="reportReturn">実験画面に戻る</button></div>
   </div>
