@@ -260,6 +260,17 @@ function testAttackFreeOutcomes(){
  assert.equal(lab.stats.ai.encounterStarts,3);
  console.log('✓ 1日無被弾／途中被弾／その他死亡を重複なく分類');
 }
+function testValidatedDefaultEscapePolicy(){
+ const inputs={seed:20270001,green:100,red:20,blue:0,regrowth:100,variance:10,duration:12,mode:'escape'};
+ const defaultAI=new Lab(inputs),wideAI=new Lab({...inputs,escapePolicy:'wide'}),oldAI=new Lab({...inputs,escapePolicy:'baseline'});
+ assert.equal(defaultAI.settings.escapePolicy,'wide');
+ assert.equal(wideAI.settings.escapePolicy,'wide');
+ assert.equal(oldAI.settings.escapePolicy,'baseline');
+ defaultAI.run(12,.08);wideAI.run(12,.08);oldAI.run(12,.08);
+ assert.deepEqual(defaultAI.summary(),wideAI.summary(),'Released AI1 must exactly use validated wide policy');
+ assert.ok(defaultAI.stats.ai.fleeDays>0&&oldAI.stats.ai.fleeDays>0);
+ console.log('✓ AI①の早期警戒改良がデフォルトで有効。旧方式も検証用に保持');
+}
 function testUnchangedRedRules(){
  const input={seed:424242,green:0,red:10,blue:0,variance:10,regrowth:100,duration:40};
  const n=new Lab({...input,mode:'normal'});
@@ -279,4 +290,5 @@ testEscapeBehaviorTelemetry();
 testDistanceBreakClassification();
 testAttackFreeExposure();
 testAttackFreeOutcomes();
+testValidatedDefaultEscapePolicy();
 testUnchangedRedRules();
