@@ -27,6 +27,20 @@ function attach(lab,mode){
  const co=Object.fromEntries(groups.map(g=>[g,blank()]));
  co['0'].born=lab.settings.green;
  let tick=.08;
+ // Historical 2026-11-19 study used the pre-tuning 8% ±0.34 mutation.
+ // Pin it here so the archived 100-seed data remains reproducible even
+ // after the production AI① model adopts gentler mutations.
+ lab.mutateBrain=function(parent){
+   let changed=0;
+   const child=parent.genome.map(w=>{
+     if(this.rnd()<.08){changed++;return Math.max(-3,Math.min(3,w+(this.rnd()*2-1)*.34))}
+     return w;
+   });
+   this.stats.ai.offspring++;
+   if(changed)this.stats.ai.mutatedOffspring++;
+   this.stats.ai.mutatedGenes+=changed;
+   return child;
+ };
  if(mode!=='evolve'){
    const mutate=lab.mutateBrain;
    lab.mutateBrain=function(parent){
