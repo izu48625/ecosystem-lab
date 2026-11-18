@@ -1,0 +1,53 @@
+name: AI1 green-priority third independent 100 seeds
+on:
+  push:
+    branches:
+      - experiment/ai1-survival-balanced-20261119
+    paths:
+      - '.github/workflows/ai1-alert-confirm.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "confirm-${{ matrix.offset }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        offset: [0,25,50,75]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run third untouched confirmation seeds
+        run: |
+          mkdir -p confirmation-shards
+          node tests/ai1-survival-study.js ${{ matrix.offset }} 25 20292001 normal,baseline,alert,baselineClone,alertClone > confirmation-shards/seed-${{ matrix.offset }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: confirmation-${{ matrix.offset }}
+          path: confirmation-shards/
+          if-no-files-found: error
+  conclusion:
+    needs: shard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: confirmation-*
+          path: confirmation-shards/
+          merge-multiple: true
+      - name: Evaluate predeclared green-priority gates
+        run: node tests/ai1-alert-confirm.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-third-holdout-report
+          path: reports/ai1-confirm-output/
+          if-no-files-found: error

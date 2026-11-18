@@ -1,0 +1,30 @@
+name: AI1 ecological robustness scenarios
+on:
+  push:
+    branches:
+      - experiment/ai1-survival-balanced-20261119
+    paths:
+      - '.github/workflows/ai1-robustness.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scenarios:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [red10,red30,grass75,grass125,day200]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compare released AI1 against Normal in stressed ecology
+        run: node tests/ai1-robustness-study.js ${{ matrix.scenario }} 40
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-robustness-${{ matrix.scenario }}
+          path: reports/ai1-robustness-output/
+          if-no-files-found: error

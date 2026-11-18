@@ -1,0 +1,30 @@
+name: AI1 alert robustness ecological stress
+on:
+  push:
+    branches:
+      - experiment/ai1-survival-balanced-20261119
+    paths:
+      - '.github/workflows/ai1-alert-stress.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  scenarios:
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [red10,red30,grass75,grass125,day200]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Compare alert and released AI1 against Normal with stressed environment
+        run: node tests/ai1-alert-stress.js ${{ matrix.scenario }} 40
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alert-stress-${{ matrix.scenario }}
+          path: reports/ai1-alert-stress-output/
+          if-no-files-found: error
