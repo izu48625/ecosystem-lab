@@ -8,7 +8,7 @@ const {Lab,SPECIES,BRAIN_SIZE}=require('../src/sim-core.js');
 const offset=Number(process.argv[2]??0),count=Number(process.argv[3]??25);
 const seedBase=Number(process.argv[4]??20261117);
 assert.ok(Number.isInteger(offset)&&offset>=0&&Number.isInteger(count)&&count>=1&&count<=100&&Number.isInteger(seedBase)&&seedBase>=1);
-const settings={green:100,red:20,blue:0,regrowth:100,variance:10,duration:100,mode:'escape'};
+const settings={green:100,red:20,blue:0,regrowth:100,variance:10,duration:100,mode:'escape',escapePolicy:'baseline'};
 const allCases=[
  {key:'baseline',p:.08,amp:.34},
  {key:'p04_a034',p:.04,amp:.34},
