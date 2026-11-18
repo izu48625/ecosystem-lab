@@ -102,9 +102,20 @@ function frame(t){
  if(activeTab!=='ai2'){draw();if(t-chartAt>180){drawCharts();chartAt=t}if(t-lastUI>160){show();lastUI=t}}requestAnimationFrame(frame)
 }
 function exportCSV(){
- const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg','aiMeanGeneration','aiEscapeBias','aiOffspring','aiMutated','aiFleeDays'];
- const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]).join(','))];
+ const keys=['day','g','r','b','grass','birthg','birthr','birthb','killsr','killsb','huntsr','huntsb','starveg','starver','starveb','ager','ageb','counters','daysr','daysb','edger','edgeb','starvegrassg','aiMeanGeneration','aiEscapeBias','aiOffspring','aiMutated','aiFleeDays',
+  'aiFleeStarts','aiMeanFleeStartDistance','aiMeanTurnDeg','aiMeanAwayDeg',
+  'aiChaseStarts','aiChaseEscaped','aiChaseCaught','aiChaseOther','aiChaseDistanceBreakPct'];
+ const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]??'').join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ecosystem_${lab.settings.mode}_seed_${lab.settings.seed}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+} 
+function exportEscapeCSV(){
+ if(activeTab!=='ai1')return;
+ const ai=lab.stats.ai,keys=['day','kind','greenId','generation','redId','startDistance','turnDeg','awayDeg','outcome'];
+ const rows=[keys.join(','),...ai.escapeEvents.map(event=>keys.map(k=>event[k]??'').join(','))];
+ const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='ecosystem_AI1_escape_events_DAY'+Math.round(lab.day)+'_seed'+lab.settings.seed+'.csv';
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 // Tab worlds never share births, individuals, history, paused state, or settings.
 function snapshotWorld(){
@@ -124,6 +135,7 @@ function switchTab(next){
    $(view).hidden=key!==next;$(button).setAttribute('aria-selected',String(key===next));
  }
  $('view-live').hidden=next==='ai2';
+ $('escapeCsv').hidden=next!=='ai1';
  if(next==='ai2'){
    playing=false;
    $('stateText').textContent='AI②は設計中';
@@ -167,6 +179,7 @@ $('single').onclick=()=>advanceTo(Math.floor(lab.day)+1);
 $('jump10').onclick=()=>advanceTo(lab.day+10);
 $('jump100').onclick=()=>advanceTo(lab.day+100);
 $('csv').onclick=exportCSV;
+$('escapeCsv').onclick=exportEscapeCSV;
 $('openReport').onclick=()=>{
  if(activeTab==='ai2')return;
  playing=false;accum=0;show();
@@ -175,6 +188,7 @@ $('openReport').onclick=()=>{
 $('closeReport').onclick=()=>window.EcosystemReport.close();
 $('reportReturn').onclick=()=>window.EcosystemReport.close();
 $('reportSavePng').onclick=()=>window.EcosystemReport.exportPNG();
+$('reportGenerationCsv').onclick=()=>window.EcosystemReport.exportGenerationCSV();
 $('unselect').onclick=()=>{focus=null;zoom=1};$('zin').onclick=()=>{zoom=Math.min(4,zoom*1.45)};$('zout').onclick=()=>{zoom=Math.max(1,zoom/1.45)};$('zreset').onclick=()=>{focus=null;zoom=1};
 $('variance').oninput=()=>{$('varText').textContent='±'+$('variance').value+'%'};$('regrowth').oninput=()=>{$('regText').textContent=$('regrowth').value+'%'};
 document.querySelectorAll('#speeds button').forEach(btn=>btn.onclick=()=>{speed=Number(btn.dataset.s);document.querySelectorAll('#speeds button').forEach(b=>b.classList.toggle('active',b===btn))});
