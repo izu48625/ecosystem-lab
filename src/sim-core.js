@@ -317,17 +317,17 @@
       const {cellSize,nx,ny,buckets}=index;
       const minX=clamp(Math.floor((a.x-range)/cellSize),0,nx-1),maxX=clamp(Math.floor((a.x+range)/cellSize),0,nx-1);
       const minY=clamp(Math.floor((a.y-range)/cellSize),0,ny-1),maxY=clamp(Math.floor((a.y+range)/cellSize),0,ny-1);
-      let count=0,cx=0,cy=0,ax=0,ay=0,sx=0,sy=0,nearest=range;
+      let count=0,nearCount=0,cx=0,cy=0,ax=0,ay=0,sx=0,sy=0,nearest=range;
       for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++)for(const b of buckets[y*nx+x]){
         if(b===a||!b.alive||b.type!=='g')continue;
         const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy);
         if(dist>=range||dist<1e-5)continue;
-        count++;cx+=b.x;cy+=b.y;ax+=Math.cos(b.angle);ay+=Math.sin(b.angle);
+        count++;if(dist<65)nearCount++;cx+=b.x;cy+=b.y;ax+=Math.cos(b.angle);ay+=Math.sin(b.angle);
         nearest=Math.min(nearest,dist);
         if(dist<38){sx-=dx/Math.max(dist,1);sy-=dy/Math.max(dist,1)}
       }
       const dir=Math.hypot(ax,ay),repel=Math.hypot(sx,sy);
-      return {count,cx:count?cx/count:a.x,cy:count?cy/count:a.y,
+      return {count,nearCount,cx:count?cx/count:a.x,cy:count?cy/count:a.y,
         ax:dir?ax/dir:0,ay:dir?ay/dir:0,
         sx:repel?sx/repel:0,sy:repel?sy/repel:0,nearest};
     }
@@ -370,6 +370,7 @@
           // long-range fleeing while accessible plants remain nearby.
           const escapeAI=this.settings.mode!=='normal',socialAI=this.settings.mode==='social';
           const social=socialAI&&this.settings.socialEnabled?this.socialContext(e,index):null;
+          if(socialAI)e.socialNeighbors=social?.nearCount||0;
           const socialGenes=social?neuralForward(e.genome,[
             clamp((social.cx-e.x)/115,-1,1),clamp((social.cy-e.y)/115,-1,1),
             social.ax,social.ay,clamp(social.count/12,0,1),
