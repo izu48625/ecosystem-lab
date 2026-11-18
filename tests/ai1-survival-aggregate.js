@@ -7,7 +7,10 @@ const names=['normal','baseline','alert','multi','wall','combo','budget','adapti
 function read(stage){
  const seeds=[];
  for(const offset of [0,25,50,75]){
-  const o=JSON.parse(fs.readFileSync('benchmark-shards/'+stage+'-'+offset+'.json','utf8'));
+  const raw=fs.readFileSync('benchmark-shards/'+stage+'-'+offset+'.json','utf8');
+  const start=raw.indexOf('CHASE_STUDY_BEGIN'),end=raw.indexOf('CHASE_STUDY_END');
+  assert.ok(start>=0&&end>start,'Missing shard result framing: '+stage+'/'+offset);
+  const o=JSON.parse(raw.slice(start+'CHASE_STUDY_BEGIN'.length,end).trim());
   assert.equal(o.samples.length,25);
   seeds.push(...o.samples);
  }
