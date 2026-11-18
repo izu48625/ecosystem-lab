@@ -35,5 +35,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Compare 5 mutation settings over 25 matched seeds
-        run: node tests/escape-mutation-sweep.js ${{ matrix.offset }} 25 20261217
+      - name: Preselected 2% low-amplitude escape AI vs baseline on fresh seeds
+        run: node tests/escape-mutation-sweep.js ${{ matrix.offset }} 25 20261317 baseline,p02_a010
