@@ -121,7 +121,7 @@ function render(lab){
    set('reportLogInfo','個別イベント記録 '+pretty(lab.stats.ai.escapeEvents.length)+'件'+(t.eventsDropped?'／上限超過 '+pretty(t.eventsDropped)+'件は個別ログ省略':'')+'。日別・世代別の集計は全件。');
    $('reportGenerationRows').innerHTML=t.rows.map(row=>
      '<tr><td>'+row.name+'</td><td>'+pretty(row.fleeStarts)+'</td><td>'+row.distance+
-     '</td><td>'+row.turn+'°</td><td>'+row.chaseEscaped+' / '+row.resolved+'</td></tr>'
+     '</td><td>'+(row.turn==='—'?'—':row.turn+'°')+'</td><td>'+row.chaseEscaped+' / '+row.resolved+'</td></tr>'
    ).join('');
  }
  set('reportMode',d.isAI?'AI① 逃走進化':'ノーマル（学習なし）');
