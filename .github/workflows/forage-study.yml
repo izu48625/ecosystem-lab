@@ -1,0 +1,28 @@
+name: AI1 foraging controlled study
+on:
+  push:
+    branches:
+      - experiment/ai1-foraging-20261119-v1
+    paths:
+      - 'tests/forage-decision.js'
+      - '.github/workflows/forage-study.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run paired 100-seed discovery and 100-seed independent holdout
+        run: node tests/forage-decision.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai1-foraging-benchmark
+          path: reports/forage-benchmark-output/
+          if-no-files-found: warn
