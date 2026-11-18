@@ -5,6 +5,7 @@ on:
       - research/ai1-selection-pressure-20261119
     paths:
       - '.github/workflows/ai1-genetic-pilot.yml'
+      - 'tests/ai1-genetic-training.js'
   workflow_dispatch:
 permissions:
   contents: read
