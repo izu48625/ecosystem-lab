@@ -1,0 +1,31 @@
+name: AI2 social evolution functionality and UI regression
+on:
+  push:
+    branches:
+      - feature/ai2-herd-evolution-20261119
+    paths:
+      - '.github/workflows/ai2-social-test.yml'
+      - 'src/**'
+      - 'index.html'
+      - 'tests/ai2-social.test.js'
+      - 'tests/ui-smoke.js'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Current Normal and AI1 physics/fitness regression
+        run: node tests/smoke.test.js
+      - name: Grouping social neural behavior and no-group ablation
+        run: node tests/ai2-social.test.js
+      - name: Browser tab controls and screenshots
+        run: node tests/ui-smoke.js
+      - name: Same-seed Normal / AI1 comparison
+        run: node tests/escape-comparison.js 4

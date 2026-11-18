@@ -64,10 +64,10 @@ function tacticalData(ai){
 }
 function dataFor(lab){
   const n=lab.counts(),st=lab.stats,ai=st.ai||{},mode=lab.settings.mode;
-  const isAI=mode==='escape',greenAlive=lab.entities.filter(e=>e.alive&&e.type==='g');
+  const isAI=mode!=='normal',isSocial=mode==='social',greenAlive=lab.entities.filter(e=>e.alive&&e.type==='g');
   const peakGeneration=Math.max(0,...lab.history.map(h=>h.aiMeanGeneration||0));
   return {
-    isAI,day:lab.day,seed:lab.settings.seed,initialGreen:lab.settings.green,
+    isAI,isSocial,herd:lab.history.at(-1),day:lab.day,seed:lab.settings.seed,initialGreen:lab.settings.green,
     initialRed:lab.settings.red,green:n.g,red:n.r,
     birthGreen:st.births.g,birthRed:st.births.r,
     huntGreen:st.deaths.g.hunt,starveGreen:st.deaths.g.starve,
@@ -109,7 +109,7 @@ function paintGraph(canvas,data){
 function render(lab){
  activeLab=lab;
  const d=dataFor(lab);
- set('reportHeading',d.isAI?'AI①｜逃走進化・実験結果':'ノーマル｜実験結果');
+ set('reportHeading',d.isSocial?'AI②｜群れ行動の進化・実験結果':d.isAI?'AI①｜逃走進化・実験結果':'ノーマル｜実験結果');
  set('reportMeta','DAY '+d.day.toFixed(1)+' / Seed '+d.seed+' / 緑'+d.initialGreen+'・赤'+d.initialRed);
  set('reportFinal','緑 '+pretty(d.green)+' / 赤 '+pretty(d.red));
  set('reportStatus',d.green===0&&d.red===0?'両種絶滅':d.green===0?'緑が絶滅':d.red===0?'赤が絶滅':d.day>=100?'100日到達・観察結果':'経過途中の記録');
@@ -123,6 +123,14 @@ function render(lab){
  set('rrMutation',d.isAI?pretty(d.mutations):'—');
  set('rrFlee',d.fleeRate);
  $('reportTelemetry').hidden=!d.isAI;
+ $('reportSocialMetrics').hidden=!d.isSocial;
+ if(d.isSocial){
+  const h=d.herd||{};
+  set('rrSocialGrouped',h.ai2GroupedPct===undefined?'—':h.ai2GroupedPct.toFixed(1)+'%');
+  set('rrSocialNeighbors',h.ai2MeanNeighbors===undefined?'—':h.ai2MeanNeighbors.toFixed(2));
+  set('rrSocialMaxGroup',h.ai2MaxLocalGroup??'—');
+  set('rrSocialGeneration',(h.aiMeanGeneration??0).toFixed(1));
+ }
  $('reportGenerationCsv').hidden=!d.isAI;
  if(d.isAI){
    const t=d.tactics;
@@ -136,10 +144,10 @@ function render(lab){
      '</td><td>'+(row.turn==='—'?'—':row.turn+'°')+'</td><td>'+row.chaseEscaped+' / '+row.resolved+'</td><td>'+row.attackFreeRate+'</td></tr>'
    ).join('');
  }
- set('reportMode',d.isAI?'AI① 逃走進化':'ノーマル（学習なし）');
- set('reportInputs',d.isAI?'入力：赤の相対位置・進行方向・近さ、緑自身のHP・空腹・位置、周囲の草':'入力：緑は固定ルールで危険を判定（AIの入力・学習なし）');
- set('reportOutputs',d.isAI?(lab.settings.escapePolicy==='wide'?'判断：赤を早めに警戒し、逃走方向の大きなブレを抑制。神経回路が逃走開始と角度・左右回避を調整':'判断：逃走開始のしきい値・逃げる角度・左右への回避'):'判断：敵との距離で逃走し、草を探索する既定の行動');
- set('reportGenetics',d.isAI?`進化：10入力→8神経→3出力／115重み。出生時に親の重みを継承し、各重み${mutationRate}の確率で±${mutationAmplitude}まで変異。生存・繁殖によって自然選択。個体内の強化学習はなし。`:'赤・緑ともに行動AIの遺伝・突然変異・進化はなし。赤の捕食と繁殖条件はAI①と共通。');
+ set('reportMode',d.isSocial?'AI② 群れ行動進化':d.isAI?'AI① 逃走進化':'ノーマル（学習なし）');
+ set('reportInputs',d.isSocial?'入力：仲間の相対位置・進行方向・近接数・距離、緑の空腹・位置・草（計10入力）':d.isAI?'入力：赤の相対位置・進行方向・近さ、緑自身のHP・空腹・位置、周囲の草':'入力：緑は固定ルールで危険を判定（AIの入力・学習なし）');
+ set('reportOutputs',d.isSocial?'判断：仲間へ集まる・進行方向を合わせる・密集を避ける。警戒逃走は固定wideルールで、群れに防御ボーナスなし':d.isAI?(lab.settings.escapePolicy==='wide'?'判断：赤を早めに警戒し、逃走方向の大きなブレを抑制。神経回路が逃走開始と角度・左右回避を調整':'判断：逃走開始のしきい値・逃げる角度・左右への回避'):'判断：敵との距離で逃走し、草を探索する既定の行動');
+ set('reportGenetics',d.isAI?`遺伝：10入力→8神経→3出力／115重み。出生時に親の重みを継承し、各重み${mutationRate}の確率で±${mutationAmplitude}まで変異。生存・繁殖で個体が選ばれ得るが、能力向上は未証明。個体内の強化学習はなし。`:'赤・緑ともに行動AIの遺伝・突然変異・進化はなし。赤の捕食と繁殖条件はAI①と共通。');
  $('reportOverlay').hidden=false;
  paintGraph($('reportChart'),d);
 }
@@ -156,7 +164,7 @@ function exportPNG(){
  };
  rect(0,0,1080,cv.height,'#0b191a');
  txt('ECOSYSTEM LAB  /  EXPERIMENT REPORT',55,65,22,'#8dceaa','800');
- txt(d.isAI?'AI①｜逃走進化・結果':'ノーマル｜実験結果',55,133,47,'#f1fff6','800');
+ txt(d.isSocial?'AI②｜群れ行動・実験結果':d.isAI?'AI①｜逃走進化・結果':'ノーマル｜実験結果',55,133,47,'#f1fff6','800');
  txt('DAY '+d.day.toFixed(1)+'   /   SEED '+d.seed,55,185,27,'#b1d5c4');
  rect(52,215,976,106,'#193e32',16);
  txt(d.green===0&&d.red===0?'両種絶滅':d.day>=100?'100日以上観察':'途中経過',76,258,23,'#abd8bb');
@@ -171,7 +179,8 @@ function exportPNG(){
    ['緑・生存',d.green],['赤・生存',d.red],['緑・出生',d.birthGreen],['赤・出生',d.birthRed],
    ['緑・捕食死',d.huntGreen],['緑・餓死',d.starveGreen],['赤・餓死',d.starveRed],['赤・捕食成功率',d.redRate],
    ['最高世代',d.isAI?d.maxGeneration:'—'],['ピーク平均世代',d.isAI?d.peakGeneration.toFixed(2):'—'],
-   ['変異した子',d.isAI?d.mutations:'—'],['危険時の逃走割合',d.fleeRate]
+   d.isSocial?['群れの割合',d.herd.ai2GroupedPct?.toFixed(1)+'%']:['変異した子',d.isAI?d.mutations:'—'],
+   d.isSocial?['近くの仲間の平均',d.herd.ai2MeanNeighbors?.toFixed(2)]:['危険時の逃走割合',d.fleeRate]
  ];
  const left=52,cellW=237,gap=9,startY=707,cellH=100;
  cells.forEach(([key,val],i)=>{
@@ -216,11 +225,11 @@ function exportPNG(){
  rect(52,1055+infoShift,976,287,'#142e29',15);
  txt('何を・どう学習させる？',74,1106+infoShift,30,'#dcffe8','800');
  if(d.isAI){
-   txt('入力｜赤の相対位置・方向・近さ／緑のHP・空腹・位置／草',74,1159+infoShift,22,'#b7ded0');
-   txt(activeLab.settings.escapePolicy==='wide'?'判断｜早期警戒・方向のブレを抑えた逃走／神経回路で角度を調整':'判断｜逃走開始・角度・左右回避を神経回路が調整',74,1202+infoShift,22,'#b7ded0');
+   txt(d.isSocial?'入力｜仲間の位置・向き・密度／空腹／位置／草':'入力｜赤の相対位置・方向・近さ／緑のHP・空腹・位置／草',74,1159+infoShift,22,'#b7ded0');
+   txt(d.isSocial?'判断｜集合・方向合わせ・密集回避を遺伝したNNで調整':activeLab.settings.escapePolicy==='wide'?'判断｜早期警戒・方向のブレを抑えた逃走／神経回路で角度を調整':'判断｜逃走開始・角度・左右回避を神経回路が調整',74,1202+infoShift,22,'#b7ded0');
    txt('遺伝｜10入力 → 8神経 → 3出力、115重み',74,1245+infoShift,22,'#b7ded0');
    txt(`進化｜出生時に継承、各重み${mutationRate}で±${mutationAmplitude}変異`,74,1288+infoShift,22,'#b7ded0');
-   txt('選択｜生存・繁殖（個体内の経験学習はなし）',74,1325+infoShift,19,'#91cbae');
+   txt('選択｜生存・繁殖。能力向上は未証明（強化学習なし）',74,1325+infoShift,19,'#91cbae');
  }else{
    txt('緑・赤とも行動は固定ルールで決定します。',74,1182+infoShift,25,'#b7ded0');
    txt('行動AIを世代交代で進化させる処理はありません。',74,1236+infoShift,24,'#b7ded0');
@@ -234,13 +243,13 @@ function exportPNG(){
  cv.toBlob(blob=>{
    if(!blob)return;
    const url=URL.createObjectURL(blob),a=document.createElement('a');
-   a.href=url;a.download='ecosystem_'+(d.isAI?'AI1':'normal')+'_DAY'+Math.round(d.day)+'_seed'+d.seed+'.png';
+   a.href=url;a.download='ecosystem_'+(d.isSocial?'AI2':d.isAI?'AI1':'normal')+'_DAY'+Math.round(d.day)+'_seed'+d.seed+'.png';
    document.body.appendChild(a);a.click();a.remove();
    setTimeout(()=>URL.revokeObjectURL(url),2000);
  },'image/png');
 }
 function exportGenerationCSV(){
- if(!activeLab||activeLab.settings.mode!=='escape')return;
+ if(!activeLab||activeLab.settings.mode==='normal')return;
  const ai=activeLab.stats.ai;
  const keys=['generation','born','flee_starts','mean_start_distance_px','mean_turn_deg','mean_away_deviation_deg','chase_starts','chase_distance_breaks','chase_caught','chase_other','chase_open','distance_break_pct_resolved','encounters_120px','encounter_1d_survived_unhit','encounter_hit','encounter_died_other','encounter_open','attackfree_1d_pct_resolved'];
  const rows=[keys.join(',')];
@@ -261,7 +270,7 @@ function exportGenerationCSV(){
  }
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob),a=document.createElement('a');
- a.href=url;a.download='ecosystem_AI1_generation_DAY'+Math.round(activeLab.day)+'_seed'+activeLab.settings.seed+'.csv';
+ a.href=url;a.download='ecosystem_'+(activeLab.settings.mode==='social'?'AI2':'AI1')+'_generation_DAY'+Math.round(activeLab.day)+'_seed'+activeLab.settings.seed+'.csv';
  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 root.EcosystemReport={render,close,exportPNG,exportGenerationCSV,dataFor};
