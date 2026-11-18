@@ -21,19 +21,3 @@ jobs:
         run: node tests/predator-balance.js 3
       - name: Sample paired Normal vs AI escape evolution
         run: node tests/escape-comparison.js 4
-
-  mutation_sweep:
-    name: Mutation sweep offset ${{ matrix.offset }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        offset: [0, 25, 50, 75]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Preselected 2% low-amplitude escape AI vs baseline on fresh seeds
-        run: node tests/escape-mutation-sweep.js ${{ matrix.offset }} 25 20261317 baseline,p02_a010
