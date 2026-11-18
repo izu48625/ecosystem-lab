@@ -10,7 +10,7 @@ const assert=require('node:assert/strict');
 const {Lab,SPECIES,ESCAPE_MUTATION}=require('../src/sim-core.js');
 const offset=Number(process.argv[2]??0),count=Number(process.argv[3]??25),control=process.argv[4]==='clone'?'clone':'evolve';
 assert.ok(Number.isInteger(offset)&&offset>=0&&Number.isInteger(count)&&count>=1&&count<=100);
-const settings={green:100,red:20,blue:0,variance:10,regrowth:100,duration:100,mode:'escape'};
+const settings={green:100,red:20,blue:0,variance:10,regrowth:100,duration:100,mode:'escape',escapePolicy:'baseline'};
 const groups=['gen0','gen1_2','gen3_5','gen6_9','gen10plus'];
 const groupOf=n=>n===0?'gen0':n<=2?'gen1_2':n<=5?'gen3_5':n<=9?'gen6_9':'gen10plus';
 const zero=()=>({born:0,fleeStarts:0,startDistanceSum:0,turnSamples:0,turnDegSum:0,awayDegSum:0,chaseStarts:0,chaseEscaped:0,chaseCaught:0,chaseOther:0});
