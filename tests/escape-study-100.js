@@ -28,7 +28,7 @@ function metrics(lab){
   };
 }
 for(let i=0;i<count;i++){
-  const seed=20261117+offset+i,normal=new Lab({...baseline,seed,mode:'normal'}),ai=new Lab({...baseline,seed,mode:'escape'});
+  const seed=20261117+offset+i,normal=new Lab({...baseline,seed,mode:'normal'}),ai=new Lab({...baseline,seed,mode:'escape',escapePolicy:'baseline'});
   const normalRed=normal.entities.filter(x=>x.type==='r');
   const aiRed=ai.entities.filter(x=>x.type==='r');
   assert.equal(normalRed.length,aiRed.length);
