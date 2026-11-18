@@ -162,7 +162,7 @@ function testEscapeBehaviorTelemetry(){
  assert.equal(sum('chaseCaught'),ai.chaseCaught);
  assert.equal(sum('chaseOther'),ai.chaseOther);
  assert.equal(ai.escapeEvents.length+ai.eventsDropped,
-   ai.fleeStarts+ai.chaseEscaped+ai.chaseCaught);
+   ai.fleeStarts+ai.chaseStarts+ai.chaseEscaped+ai.chaseCaught+ai.chaseOther);
  for(const event of ai.escapeEvents){
    assert.ok(event.generation>=0&&event.day>0&&event.day<=100);
    if(event.kind==='flee_start'){
@@ -171,9 +171,12 @@ function testEscapeBehaviorTelemetry(){
        assert.ok(event.turnDeg>=0&&event.turnDeg<=180);
        assert.ok(event.awayDeg>=0&&event.awayDeg<=180);
      }
+   }else if(event.kind==='chase_start'){
+     assert.ok(event.startDistance>0&&event.startDistance<=300);
    }else{
      assert.equal(event.kind,'chase_end');
-     assert.ok(['escaped','caught'].includes(event.outcome));
+     assert.ok(['escaped','caught','other'].includes(event.outcome));
+     assert.ok(event.pursuitDays>=0);
    }
  }
  const end=lab.history.at(-1);
