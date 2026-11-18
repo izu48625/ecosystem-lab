@@ -1,0 +1,60 @@
+name: AI1 trained-gene ecological release 20-seed comparison
+on:
+  push:
+    branches:
+      - research/ai1-selection-pressure-20261119
+    paths:
+      - '.github/workflows/ai1-elite-ecology.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  shard:
+    name: "release-${{ matrix.offset }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        offset: [0,5,10,15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 44406743528
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: train-discovery-*
+          path: reports/ga-training/
+          merge-multiple: true
+      - name: Replant elite genes in released AI1 and trace green descendants
+        run: node tests/ai1-elite-ecology.js ${{ matrix.offset }} 5 20370001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elite-release-${{ matrix.offset }}
+          path: reports/ga-elite-ecology/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: elite-release-*
+          path: reports/ga-elite-ecology/
+          merge-multiple: true
+      - name: Evaluate original ecology persistence and red-green coexistence
+        run: node tests/ai1-elite-aggregate.js 20 5 20370001 discovery
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai1-elite-release-discovery-report
+          path: reports/ga-elite-summary/
+          if-no-files-found: error
