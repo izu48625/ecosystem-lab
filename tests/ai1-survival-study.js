@@ -11,7 +11,7 @@ const base=Number(process.argv[4]??20261117);
 const selected=(process.argv[5]||'normal,baseline,alert,multi,wall,combo,budget,adaptive').split(',');
 assert.ok(Number.isInteger(offset)&&offset>=0&&Number.isInteger(count)&&count>=1&&count<=100);
 assert.ok(Number.isInteger(base)&&base>0);
-const allowed=['normal','baseline','alert','multi','wall','combo','budget','adaptive','baselineClone'];
+const allowed=['normal','baseline','alert','multi','wall','combo','budget','adaptive','baselineClone','alertClone'];
 assert.ok(selected.length>=2&&new Set(selected).size===selected.length&&selected.every(x=>allowed.includes(x)));
 const options={green:100,red:20,blue:0,regrowth:100,variance:10,duration:100};
 const groups=['0','1-2','3-5','6-9','10+'];
@@ -67,8 +67,8 @@ function observeChase(lab){
  return {totals,byGen,targetCount:()=>targetSelections};
 }
 function simulate(seed,arm){
- const normal=arm==='normal',clone=arm==='baselineClone';
- const strategy=['alert','multi','wall','combo','budget','adaptive'].includes(arm)?arm:'baseline';
+ const normal=arm==='normal',clone=arm==='baselineClone'||arm==='alertClone';
+ const strategy=arm==='alertClone'?'alert':(['alert','multi','wall','combo','budget','adaptive'].includes(arm)?arm:'baseline');
  const lab=new Lab({...options,seed,mode:normal?'normal':'escape',escapePolicy:'wide',escapeStrategy:strategy});
  if(clone){
   const actual=lab.mutateBrain;
