@@ -162,7 +162,8 @@ function testEscapeBehaviorTelemetry(){
  assert.equal(sum('chaseCaught'),ai.chaseCaught);
  assert.equal(sum('chaseOther'),ai.chaseOther);
  assert.equal(ai.escapeEvents.length+ai.eventsDropped,
-   ai.fleeStarts+ai.chaseStarts+ai.chaseEscaped+ai.chaseCaught+ai.chaseOther);
+   ai.fleeStarts+ai.chaseStarts+ai.chaseEscaped+ai.chaseCaught+ai.chaseOther+
+   ai.encounterStarts+ai.encounterSurvived+ai.encounterHit+ai.encounterDiedOther);
  for(const event of ai.escapeEvents){
    assert.ok(event.generation>=0&&event.day>0&&event.day<=100);
    if(event.kind==='flee_start'){
@@ -173,6 +174,13 @@ function testEscapeBehaviorTelemetry(){
      }
    }else if(event.kind==='chase_start'){
      assert.ok(event.startDistance>0&&event.startDistance<=300);
+   }else if(event.kind==='red_proximity_start'){
+     assert.ok(event.startDistance>=0&&event.startDistance<=120.000001);
+     assert.equal(event.windowDays,1);
+   }else if(event.kind==='red_proximity_end'){
+     assert.ok(['survived','hit','diedOther'].includes(event.outcome));
+     assert.ok(event.startDistance>=0&&event.startDistance<=120.000001);
+     assert.equal(event.windowDays,1);
    }else{
      assert.equal(event.kind,'chase_end');
      assert.ok(['escaped','caught','other'].includes(event.outcome));
