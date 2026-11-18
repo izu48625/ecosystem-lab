@@ -24,6 +24,11 @@ function creature(e){
   c.fillStyle=e.type==='r'?'#ffd2ac':'#bdd6ff';c.beginPath();c.moveTo(6,-4);c.lineTo(15,0);c.lineTo(6,4);c.fill();
   c.fillStyle='#183541';c.fillRect(6,-4,3,2);c.fillRect(6,3,3,2)
  }
+ if(e.type==='g'&&lab.settings.mode==='social'&&e.socialNeighbors>=2){
+  // Observable local herd marker (>=2 green neighbours within 65px), not a defense buff.
+  c.strokeStyle='rgba(168,255,204,.38)';c.lineWidth=1.6;
+  c.beginPath();c.arc(0,0,16.5,0,Math.PI*2);c.stroke();
+ }
  if(e.flash>0){c.globalAlpha=clamp(e.flash*1.9,0,.65);c.fillStyle='#ffffff';c.beginPath();c.ellipse(0,0,11,8,0,0,Math.PI*2);c.fill()}
  c.restore();
  if(e.id===focus){c.lineWidth=2;c.setLineDash([4,3]);c.strokeStyle='#ffef9e';c.beginPath();c.arc(e.x,e.y,19,0,Math.PI*2);c.stroke();c.setLineDash([]);c.fillStyle='#081e1ccc';c.fillRect(e.x-19,e.y-30,38,6);c.fillStyle='#87e6a6';c.fillRect(e.x-19,e.y-30,38*clamp(e.hp/e.maxhp,0,1),6);c.fillStyle='white';c.font='bold 11px system-ui';c.textAlign='center';c.fillText('#'+e.id,e.x,e.y-35)}
