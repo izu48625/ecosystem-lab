@@ -53,6 +53,8 @@
         mode:settings.mode==='social'?'social':settings.mode==='escape'?'escape':'normal',
         // Social ablation: identical AI2 predator avoidance without neighbour steering.
         socialEnabled:settings.socialEnabled!==false,
+        // Factorial research ablation ONLY. Default false preserves released AI2.
+        socialEscapeNeural:settings.socialEscapeNeural===true,
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
@@ -395,7 +397,7 @@
             ];
             // AI② allocates the same 115 inherited weights to social decisions.
             // Threat reflex stays fixed; AI① alone uses genome for escape tactics.
-            const [turn,offset,urge]=socialAI?[0,0,0]:neuralForward(e.genome,inputs);
+            const [turn,offset,urge]=socialAI&&!this.settings.socialEscapeNeural?[0,0,0]:neuralForward(e.genome,inputs);
             const hunger=(100-e.energy)/100;
             // The standard escape reflex provides a survivable founding policy.
             // The network evolves when to flee and which route/lateral dodge to take.
