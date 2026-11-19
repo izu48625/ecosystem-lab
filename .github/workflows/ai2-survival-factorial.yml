@@ -1,0 +1,52 @@
+name: AI2 survival causal two-factor ecology 100 seeds
+on:
+  push:
+    branches:
+      - research/ai2-survival-mechanism-factorial-20261119
+    paths:
+      - '.github/workflows/ai2-survival-factorial.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "paired-${{ matrix.offset }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        offset: [0,10,20,30,40,50,60,70,80,90]
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run four escape x herd variants in ten paired 100-day worlds
+        run: node tests/ai2-survival-factorial-run.js ${{ matrix.offset }} 10 20520001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mechanism-${{ matrix.offset }}
+          path: reports/ai2-survival-factorial-raw/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mechanism-*
+          path: reports/ai2-survival-factorial-raw/
+          merge-multiple: true
+      - name: Bootstrap matched world seeds and decompose AI2 green survival advantage
+        run: node tests/ai2-survival-factorial-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-survival-causal-factorial-100-world-report
+          path: reports/ai2-survival-factorial-summary/
+          if-no-files-found: error
