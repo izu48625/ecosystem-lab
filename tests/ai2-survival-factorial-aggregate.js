@@ -14,8 +14,22 @@ for(const off of OFFSETS){
 samples.sort((a,b)=>a.seed-b.seed);
 assert.equal(samples.length,100);assert.equal(new Set(samples.map(s=>s.seed)).size,100);
 for(let i=0;i<100;i++)assert.equal(samples[i].seed,BASE+i);
+// Derived per-individual-time rates and exhaustive prey demography. These use
+// previously saved shard stats; no physics is rerun or intervention changed.
+for(const row of samples)for(const arm of ARM){
+ const p=row[arm],last=p.checkpoints[100];
+ const greendays=Math.max(1,last.greenIndividualDays),reddays=Math.max(1,last.redIndividualDays);
+ p.greenBirthsPer100GreenDays=100*p.greenBirths/greendays;
+ p.redBirthsPer100RedDays=100*p.redBirths/reddays;
+ p.redHuntsPer100RedDays=100*p.redHunts/reddays;
+ p.redKillsPer100RedDays=100*p.redKills/reddays;
+ p.redKillPerHuntPct=p.redHunts?100*p.redKills/p.redHunts:0;
+ p.greenOtherDeaths=100+p.greenBirths-p.greenHunted-p.greenStarved-p.finalGreen;
+ assert.ok(p.greenOtherDeaths>=-0.0001,'Demography mismatch');
+}
+
 const mean=(v,f)=>v.reduce((x,a)=>x+f(a),0)/v.length;
-const METRICS=['finalGreen','finalRed','greenBirths','redBirths','greenHunted','greenStarved','greenStarveRate','redStarved','redHunts','redKills','redStrikes','redAttackPerRedDay','greenHuntPerGreenDay','aiFleeDays','aiFleeStartDistance','redMeanEnergy','greenMeanEnergy','grass'];
+const METRICS=['finalGreen','finalRed','greenBirths','redBirths','greenHunted','greenStarved','greenStarveRate','redStarved','redHunts','redKills','redStrikes','redAttackPerRedDay','greenHuntPerGreenDay','greenBirthsPer100GreenDays','redBirthsPer100RedDays','redHuntsPer100RedDays','redKillsPer100RedDays','redKillPerHuntPct','greenOtherDeaths','aiFleeDays','aiFleeStartDistance','redMeanEnergy','greenMeanEnergy','grass'];
 const profile=Object.fromEntries(ARM.map(arm=>[arm,{
  ...Object.fromEntries(METRICS.map(k=>[k,mean(samples,s=>s[arm][k])])),
  greenAlive:samples.filter(s=>s[arm].greenAlive).length,
@@ -82,6 +96,7 @@ const report={
  fixedHerd:'Released AI2 fixed wide escape plus neighbour social steering'
  },
  decomposition:'Fixed escape Shapley = 0.5 * [(fixedSolo-neuralSolo)+(fixedHerd-neuralHerd)]; Herd Shapley = 0.5 * [(neuralHerd-neuralSolo)+(fixedHerd-fixedSolo)]. Additive decomposition of final AI2-AI1 contrast across intervention orders; valid only within these four implemented conditions. It is not an intrinsic, universal % of animal intelligence.',
+ demographics:'green100+births−predationDeaths−starvationDeaths−otherDeaths=finalGreen; otherDeaths includes aging and defense. Rates divide events by individual-days, rather than by terminal population.',
  interpretation:[
   'All four conditions share identical founder genes, body stats, positions and seeds. Red predators, grass regrowth, aging and reproduction code are unchanged.',
   'Neural escape+social steering reuses the same 115 weights for both decisions, which may interfere; it is a real crossed intervention but not independently trained dual-brain genotype.',
