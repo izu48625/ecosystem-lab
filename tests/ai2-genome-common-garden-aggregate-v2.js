@@ -8,6 +8,7 @@ const BASE=20485001,SEED_COUNT=100,OFFSETS=Array.from({length:20},(_,i)=>i*5);
 const DAYS=[0,30,60,100],MODES=['evolve','clone','noninherited'];
 const KEYS=['formationGroupPct','formationNear','formationApproachPx','formationAlignment',
   'crowdClosePct','crowdNearestPct','dangerNoHitPct','dangerFirstHitTime','dangerAlivePct','dangerGroupPct','dangerFinalEnergy'];
+const meanScore=(arr,fn)=>arr.length?arr.reduce((sum,x)=>sum+fn(x),0)/arr.length:null;
 const samples=[];
 for(const offset of OFFSETS){
  const d=JSON.parse(fs.readFileSync('reports/ai2-genome-common-garden-v2-raw/shard-'+offset+'.json','utf8'));
@@ -15,6 +16,21 @@ for(const offset of OFFSETS){
  assert.equal(d.samplePerWorldCheckpoint,8);
  assert.equal(d.daysPerAssay,2.4);
  samples.push(...d.samples);
+}
+// Legacy shards already include per-genome dangerFirstHitTime; recover the
+// checkpoint mean without rerunning or changing any predeclared conditions.
+for(const sample of samples){
+ for(const mode of MODES)for(const day of DAYS){
+  const cp=sample[mode].checkpoints[day];
+  if(cp.sampled>0){
+   if(cp.dangerFirstHitTime===undefined||cp.dangerFirstHitTime===null){
+    assert.ok(cp.scores.every(x=>Number.isFinite(x.dangerFirstHitTime)),
+      'Missing predator hit time from saved genome scores');
+    cp.dangerFirstHitTime=meanScore(cp.scores,x=>x.dangerFirstHitTime);
+   }
+   assert.ok(Number.isFinite(cp.dangerFirstHitTime));
+  }
+ }
 }
 samples.sort((a,b)=>a.seed-b.seed);
 assert.equal(samples.length,SEED_COUNT);
