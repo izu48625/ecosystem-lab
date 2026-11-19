@@ -1,0 +1,73 @@
+name: AI2 100-seed common garden genetic heredity validation
+on:
+  push:
+    branches:
+      - research/ai2-common-garden-genetic-validation-20261119
+    paths:
+      - '.github/workflows/ai2-genome-100.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "seed-${{ matrix.offset }}"
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        offset:
+          - 0
+          - 5
+          - 10
+          - 15
+          - 20
+          - 25
+          - 30
+          - 35
+          - 40
+          - 45
+          - 50
+          - 55
+          - 60
+          - 65
+          - 70
+          - 75
+          - 80
+          - 85
+          - 90
+          - 95
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Transplant descendant AI2 neural genomes into fixed predator and flock scenarios
+        run: node tests/ai2-genome-common-garden.js ${{ matrix.offset }} 5 20460001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-genome-${{ matrix.offset }}
+          path: reports/ai2-genome-common-garden-raw/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ai2-genome-*
+          path: reports/ai2-genome-common-garden-raw/
+          merge-multiple: true
+      - name: Compute paired seed bootstrap for true hereditary social behavior effects
+        run: node tests/ai2-genome-common-garden-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-genome-common-garden-100-world-results
+          path: reports/ai2-genome-common-garden-results/
+          if-no-files-found: error

@@ -1,0 +1,23 @@
+name: AI2 calibrated founder-only sensitivity test
+on:
+  push:
+    branches:
+      - research/ai2-common-garden-genetic-validation-20261119
+    paths:
+      - '.github/workflows/ai2-genome-v2-pilot.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run independent founder pilot without looking at future 100-seed descendants
+        run: |
+          node tests/ai2-genome-common-garden-v2.js 0 1 20472001
+          node -e "const d=require('./reports/ai2-genome-common-garden-v2-raw/shard-0.json').samples[0].evolve.checkpoints[0]; console.log('V2_FOUNDER_CALIBRATION',JSON.stringify({formation:d.formationGroupPct,approach:d.formationApproachPx,align:d.formationAlignment,crowd:d.crowdClosePct,hitfree:d.dangerNoHitPct,firsthit:d.dangerFirstHitTime,sample:d.scores.slice(0,4)}));"

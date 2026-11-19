@@ -1,0 +1,73 @@
+name: AI2 calibrated common garden genetic validation — 100 unseen seeds
+on:
+  push:
+    branches:
+      - research/ai2-common-garden-genetic-validation-20261119
+    paths:
+      - '.github/workflows/ai2-genome-100-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "validation-${{ matrix.offset }}"
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        offset:
+          - 0
+          - 5
+          - 10
+          - 15
+          - 20
+          - 25
+          - 30
+          - 35
+          - 40
+          - 45
+          - 50
+          - 55
+          - 60
+          - 65
+          - 70
+          - 75
+          - 80
+          - 85
+          - 90
+          - 95
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Evaluate DAY0/30/60/100 inherited AI2 genomes on fixed-peer and red scenarios
+        run: node tests/ai2-genome-common-garden-v2.js ${{ matrix.offset }} 5 20485001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-calibrated-${{ matrix.offset }}
+          path: reports/ai2-genome-common-garden-v2-raw/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ai2-calibrated-*
+          path: reports/ai2-genome-common-garden-v2-raw/
+          merge-multiple: true
+      - name: Bootstrap independent world seeds and evaluate mutation and inheritance effects
+        run: node tests/ai2-genome-common-garden-aggregate-v2.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-common-garden-genotype-100-seed-final
+          path: reports/ai2-genome-common-garden-v2-results/
+          if-no-files-found: error
