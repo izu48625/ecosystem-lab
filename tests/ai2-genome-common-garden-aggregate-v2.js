@@ -127,8 +127,8 @@ const report={
  ]
 };
 fs.mkdirSync('reports/ai2-genome-common-garden-v2-results',{recursive:true});
-fs.writeFileSync('reports/ai2-genome-common-garden-results/summary.json',JSON.stringify(report,null,2));
-fs.writeFileSync('reports/ai2-genome-common-garden-results/seed-level.json',JSON.stringify(samples.map(s=>({
+fs.writeFileSync('reports/ai2-genome-common-garden-v2-results/summary.json',JSON.stringify(report,null,2));
+fs.writeFileSync('reports/ai2-genome-common-garden-v2-results/seed-level.json',JSON.stringify(samples.map(s=>({
  seed:s.seed,
  population:Object.fromEntries(MODES.map(mode=>[mode,{green:s[mode].finalGreen,red:s[mode].finalRed}])),
  days:Object.fromEntries(MODES.map(mode=>[mode,Object.fromEntries(DAYS.map(day=>[day,Object.fromEntries(['population','sampled','meanGeneration',...KEYS].map(k=>[k,s[mode].checkpoints[day][k]]))]))]))
