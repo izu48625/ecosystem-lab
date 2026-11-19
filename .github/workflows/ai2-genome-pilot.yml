@@ -1,0 +1,26 @@
+name: AI2 common garden genome transfer pilot
+on:
+  push:
+    branches:
+      - research/ai2-common-garden-genetic-validation-20261119
+    paths:
+      - '.github/workflows/ai2-genome-pilot.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify inherited genome assay and genetic controls
+        run: node tests/ai2-genome-common-garden.js 0 1 20460001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-genome-pilot
+          path: reports/ai2-genome-common-garden-raw/
+          if-no-files-found: error
