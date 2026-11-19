@@ -1,0 +1,34 @@
+name: AI2 survival mechanism refined analysis from preserved worlds
+on:
+  push:
+    branches:
+      - research/ai2-survival-mechanism-factorial-20261119
+    paths:
+      - '.github/workflows/ai2-survival-reaggregate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  reaggregate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          run-id: 44429319225
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: mechanism-*
+          path: reports/ai2-survival-factorial-raw/
+          merge-multiple: true
+      - name: Analyze 100 saved worlds with normalized per-individual hunting and fertility
+        run: node tests/ai2-survival-factorial-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-survival-refined-100-world-final-report
+          path: reports/ai2-survival-factorial-summary/
+          if-no-files-found: error
