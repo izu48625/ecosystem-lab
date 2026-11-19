@@ -121,7 +121,7 @@ function assay(entities,seed,day){
   });
  }
  const metrics=['formationGroupPct','formationNear','formationApproachPx','formationAlignment',
-  'crowdClosePct','crowdNearestPct','dangerNoHitPct','dangerAlivePct','dangerGroupPct','dangerFinalEnergy'];
+  'crowdClosePct','crowdNearestPct','dangerNoHitPct','dangerFirstHitTime','dangerAlivePct','dangerGroupPct','dangerFinalEnergy'];
  return {
   population:entities.length,sampled:sample.length,
   meanGeneration:mean(entities,x=>x.generation),
