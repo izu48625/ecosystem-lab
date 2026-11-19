@@ -1,0 +1,23 @@
+name: AI2 founder assay sensitivity audit
+on:
+  push:
+    branches:
+      - research/ai2-common-garden-genetic-validation-20261119
+    paths:
+      - '.github/workflows/ai2-genome-founder-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run independent founder-only baseline check
+        run: |
+          node tests/ai2-genome-common-garden.js 0 1 20472001
+          node -e "const x=require('./reports/ai2-genome-common-garden-raw/shard-0.json').samples[0];for(const arm of ['evolve','clone','noninherited']){for(const day of [0,30,60,100]){const v=x[arm].checkpoints[day];console.log('PROBE',arm,day,JSON.stringify({population:v.population,formationGroupPct:v.formationGroupPct,formationApproachPx:v.formationApproachPx,formationAlignment:v.formationAlignment,crowdClosePct:v.crowdClosePct,dangerNoHitPct:v.dangerNoHitPct,scoreSample:v.scores.slice(0,3)}))}}"
