@@ -5,6 +5,7 @@ on:
       - research/ai2-common-garden-genetic-validation-20261119
     paths:
       - '.github/workflows/ai2-genome-v2-reaggregate.yml'
+      - 'tests/ai2-genome-common-garden-aggregate-v2.js'
   workflow_dispatch:
 permissions:
   contents: read
