@@ -53,6 +53,8 @@
         mode:settings.mode==='social'?'social':settings.mode==='escape'?'escape':'normal',
         // Social ablation: identical AI2 predator avoidance without neighbour steering.
         socialEnabled:settings.socialEnabled!==false,
+        socialEvolution:['baseline','ecoMate','ecoMateWide','ecoMateHunger'].includes(settings.socialEvolution)?settings.socialEvolution:'baseline',
+        socialNoMutation:settings.socialNoMutation===true,
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
@@ -78,16 +80,55 @@
     rnd(){this.seed=(Math.imul(this.seed,1664525)+1013904223)>>>0;return this.seed/4294967296}
     rand(a,b){return a+(b-a)*this.rnd()}
     record(kind,text){this.events.unshift({day:Number(this.day.toFixed(1)),kind,text});if(this.events.length>50)this.events.pop()}
-    mutateBrain(parent){
+    mutateBrain(parent,mate=null){
+      const experimental=this.settings.mode==='social'&&this.settings.socialEvolution!=='baseline';
+      const wide=experimental&&this.settings.socialEvolution==='ecoMateWide';
+      const chance=wide?.05:ESCAPE_MUTATION.probability,deltaMax=wide?.24:ESCAPE_MUTATION.maxDelta;
       let changed=0;
-      const child=parent.genome.map(w=>{
-        if(this.rnd()<ESCAPE_MUTATION.probability){changed++;return clamp(w+(this.rnd()*2-1)*ESCAPE_MUTATION.maxDelta,-3,3)}
-        return w;
+      const child=parent.genome.map((w,i)=>{
+        const inherited=experimental&&mate&&this.rnd()<.35?mate.genome[i]:w;
+        if(this.rnd()<chance){
+          const delta=(this.rnd()*2-1)*deltaMax;
+          if(experimental&&this.settings.socialNoMutation)return inherited;
+          changed++;return clamp(inherited+delta,-3,3);
+        }
+        return inherited;
       });
       this.stats.ai.offspring++;
       if(changed)this.stats.ai.mutatedOffspring++;
       this.stats.ai.mutatedGenes+=changed;
       return child;
+    }
+    // The mate preference is imposed by the researcher: ecological mate choice,
+    // not evidence that natural evolution has already occurred.
+    ecologicalMateScore(e){
+      const days=Math.max(.4,e.ecoDays||.4);
+      const foodRate=(e.ecoFood||0)/days;
+      const escapes=e.ecoEscapes||0,hits=e.ecoHits||0;
+      const births=e.children/Math.max(1,days/8);
+      return .50*Math.min(2.5,foodRate/32)
+        +.30*Math.min(3,births)+.30*Math.min(2.5,escapes/(1+hits))
+        -.55*Math.min(3,hits/Math.max(1,days/10))
+        +.16*Math.max(0,(e.energy-45)/55);
+    }
+    chooseEcologicalMate(parent,index){
+      const {cellSize,nx,ny,buckets}=index,range=132;
+      const minX=clamp(Math.floor((parent.x-range)/cellSize),0,nx-1),maxX=clamp(Math.floor((parent.x+range)/cellSize),0,nx-1);
+      const minY=clamp(Math.floor((parent.y-range)/cellSize),0,ny-1),maxY=clamp(Math.floor((parent.y+range)/cellSize),0,ny-1);
+      const candidates=[];
+      for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++)for(const e of buckets[y*nx+x]){
+        if(e===parent||!e.alive||e.type!=='g'||e.age<SPECIES.g.mature||e.energy<55)continue;
+        if((e.x-parent.x)**2+(e.y-parent.y)**2<range**2)candidates.push(e);
+      }
+      if(!candidates.length)return null;
+      let chosen=candidates[Math.floor(this.rnd()*candidates.length)];
+      let best=this.ecologicalMateScore(chosen);
+      for(let i=0;i<2;i++){
+        const next=candidates[Math.floor(this.rnd()*candidates.length)];
+        const score=this.ecologicalMateScore(next);
+        if(score>best){chosen=next;best=score}
+      }
+      return chosen;
     }
     aiGeneration(generation){
       const ai=this.stats.ai,key=String(generation);
@@ -160,6 +201,10 @@
       const field={survived:'encounterSurvived',hit:'encounterHit',diedOther:'encounterDiedOther'}[outcome];
       if(!field)throw new Error('Unknown encounter result: '+outcome);
       ai[field]++;group[field]++;
+      if(this.settings.mode==='social'&&this.settings.socialEvolution!=='baseline'){
+        if(outcome==='survived')green.ecoEscapes=(green.ecoEscapes||0)+1;
+        if(outcome==='hit')green.ecoHits=(green.ecoHits||0)+1;
+      }
       this.aiLog({
         day:Number(this.day.toFixed(3)),kind:'red_proximity_end',
         greenId:green.id,generation:green.generation,redId:episode.redId,
@@ -205,14 +250,17 @@
       }
       if(green.aiEncounter)this.aiEncounterFinish(green,'hit');
     }
-    spawn(type,x,y,initial=false,parent=null){
+    spawn(type,x,y,initial=false,parent=null,mate=null){
       const t=SPECIES[type], variation=()=>1+this.rand(-this.settings.variance,this.settings.variance);
       const temperament= type==='g'?(this.rnd()<.25?'timid':this.rnd()<.333?'brave':'normal'):(this.rnd()<.5?'bold':'careful');
       const age=initial?(type==='g'?this.rand(0,4):this.rand(3,9)):0;
       const e={id:++this.nextId,type,x:clamp(x,9,W-9),y:clamp(y,9,H-9),angle:this.rand(-Math.PI,Math.PI),maxhp:t.hp*variation(),attack:t.attack*variation(),speed:t.speed*variation(),life:t.life*variation(),view:t.view*variation(),energy:initial?this.rand(75,98):this.rand(80,95),age,lastBirth:this.day-(initial?this.rand(0,t.reproduction):0),lastAttack:-2,lastCounter:-2,turnAt:0,children:0,kills:0,counters:0,temperament,targetId:null,phase:this.rand(0,6),alive:true,flash:0};
       e.hp=e.maxhp;
+      if(type==='g'&&this.settings.mode==='social'&&this.settings.socialEvolution!=='baseline'){
+        e.ecoDays=0;e.ecoFood=0;e.ecoEscapes=0;e.ecoHits=0;
+      }
       if(type==='g'&&this.settings.mode!=='normal'){
-        e.genome=parent?this.mutateBrain(parent):initialBrain(this.settings.seed,e.id);
+        e.genome=parent?this.mutateBrain(parent,mate):initialBrain(this.settings.seed,e.id);
         e.generation=parent?parent.generation+1:0;
         e.parentId=parent?parent.id:null;
         if(!parent)this.stats.ai.founders++;
@@ -360,6 +408,7 @@
         if(!e.alive)continue;
         const t=SPECIES[e.type];
         this.stats.individualDays[e.type]+=dt;
+        if(e.type==='g'&&this.settings.mode==='social'&&this.settings.socialEvolution!=='baseline')e.ecoDays+=dt;
         e.age+=dt;e.energy-=dt*t.drain*(e.age<t.mature?.46:1);
         if(e.age>=e.life){this.die(e,'age');continue}
         // Hunger is checked *after* a foraging/hunting opportunity this tick.
@@ -442,9 +491,11 @@
               const length=Math.max(1e-5,Math.hypot(dx,dy));dx/=length;dy/=length;
               // Heritable choices for cohesion, heading alignment, crowd separation.
               // All can become zero: a herd is never forced or given a survival bonus.
-              const gather=Math.max(0,.16+socialGenes[0]*2.5);
-              const align=Math.max(0,.12+socialGenes[1]*2.0);
-              const spread=Math.max(0,.34+socialGenes[2]*2.2);
+              const expressive=this.settings.socialEvolution==='ecoMateWide'?1.4:1;
+              const hungerGate=this.settings.socialEvolution==='ecoMateHunger'?clamp((e.energy-28)/53,.12,1):1;
+              const gather=Math.max(0,.16+socialGenes[0]*2.5)*expressive*hungerGate;
+              const align=Math.max(0,.12+socialGenes[1]*2.0)*expressive*hungerGate;
+              const spread=Math.max(0,.34+socialGenes[2]*2.2)*expressive;
               const cx=social.cx-e.x,cy=social.cy-e.y,d=Math.max(1,Math.hypot(cx,cy));
               dx+=gather*cx/d+align*social.ax+spread*social.sx;
               dy+=gather*cy/d+align*social.ay+spread*social.sy;
@@ -452,7 +503,12 @@
             this.move(e,dx,dy,dt,55*e.speed,0,'wander');
           }
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
-          if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
+          if(amount>0){
+            this.grass[gidx]-=amount;
+            const gained=Math.min(100-e.energy,amount*92);
+            if(this.settings.mode==='social'&&this.settings.socialEvolution!=='baseline')e.ecoFood+=gained;
+            e.energy=Math.min(100,e.energy+amount*92);
+          }
         }else{
           const needsFood=e.energy<(e.type==='r'?55:64);
           let target=null;
@@ -496,12 +552,14 @@
         const fertility=e.type==='g'?clamp((foodAvailability-.05)/.38,.05,1):1;
         if(canBirth && this.rnd()<dt*t.birthRate*fertility && this.entities.length+newborn.length<MAX_POP){
           e.energy-=t.birthCost;e.lastBirth=this.day;e.children++;
-          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),parent:this.settings.mode!=='normal'&&e.type==='g'?e:null});this.stats.births[e.type]++;
+          const mate=e.type==='g'&&this.settings.mode==='social'&&this.settings.socialEvolution!=='baseline'?this.chooseEcologicalMate(e,index):null;
+          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),
+            parent:this.settings.mode!=='normal'&&e.type==='g'?e:null,mate});this.stats.births[e.type]++;
           if(e.type!=='g'&&this.stats.births[e.type]===1)this.record('birth', (e.type==='r'?'赤':'青')+'の捕食者が初めて繁殖');
         }
         e.phase+=dt*10;e.flash=Math.max(0,e.flash-dt);
       }
-      for(const item of newborn)this.spawn(item.type,item.x,item.y,false,item.parent);
+      for(const item of newborn)this.spawn(item.type,item.x,item.y,false,item.parent,item.mate);
       this.entities=this.entities.filter(e=>e.alive);
       for(const p of this.effects){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}
       this.effects=this.effects.filter(p=>p.life>0);
