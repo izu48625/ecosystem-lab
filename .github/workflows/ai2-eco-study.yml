@@ -1,0 +1,64 @@
+name: AI2 ecological mate choice — exploratory heredity and common-garden study
+on:
+  push:
+    branches:
+      - research/ai2-ecological-selection-20261123
+    paths:
+      - '.github/workflows/ai2-eco-study.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "${{ matrix.model }}-${{ matrix.offset }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 16
+      matrix:
+        model: [baseline, ecoMate, ecoMateWide, ecoMateHunger]
+        offset: [0, 5, 10, 15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Explore 100-day social ecology and genotype abilities
+        run: node tests/ai2-eco-selection-study.js ${{ matrix.offset }} 5 20560001 ${{ matrix.model }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eco-${{ matrix.model }}-${{ matrix.offset }}
+          path: reports/ai2-eco-selection-raw/${{ matrix.model }}/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: eco-*
+          path: reports/ai2-eco-download/
+          merge-multiple: false
+      - name: Arrange shards by model
+        shell: bash
+        run: |
+          mkdir -p reports/ai2-eco-selection-raw
+          for m in baseline ecoMate ecoMateWide ecoMateHunger; do
+            mkdir -p "reports/ai2-eco-selection-raw/$m"
+            for o in 0 5 10 15; do
+              cp "reports/ai2-eco-download/eco-$m-$o/shard-$o.json" "reports/ai2-eco-selection-raw/$m/shard-$o.json"
+            done
+          done
+      - name: Paired bootstrap for 20 ecology worlds per genetic strategy
+        run: node tests/ai2-eco-selection-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-eco-mating-screen-20-seeds-final
+          path: reports/ai2-eco-selection-screen/
+          if-no-files-found: error

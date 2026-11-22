@@ -1,0 +1,62 @@
+name: AI2 shared danger information + ecological mating
+on:
+  push:
+    branches:
+      - research/ai2-ecological-selection-20261123
+    paths:
+      - '.github/workflows/ai2-eco-vigilance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "alarm-${{ matrix.model }}-${{ matrix.offset }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        model: [ecoMate, ecoVigilance]
+        offset: [0,5,10,15]
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test social predator warning and eco-mate genetics
+        run: node tests/ai2-eco-selection-study.js ${{ matrix.offset }} 5 20560001 ${{ matrix.model }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eco-warning-${{ matrix.model }}-${{ matrix.offset }}
+          path: reports/ai2-eco-selection-raw/${{ matrix.model }}/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: eco-warning-*
+          path: reports/ai2-eco-warning-download/
+          merge-multiple: false
+      - name: Assemble exact paired seed shards
+        shell: bash
+        run: |
+          for m in ecoMate ecoVigilance; do
+            mkdir -p "reports/ai2-eco-vigilance-input/$m"
+            for o in 0 5 10 15; do
+              cp "reports/ai2-eco-warning-download/eco-warning-$m-$o/shard-$o.json" "reports/ai2-eco-vigilance-input/$m/shard-$o.json"
+            done
+          done
+      - name: Evaluate heredity, no-mutation, non-inheritance and ecological coexistence
+        run: node tests/ai2-eco-vigilance-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-danger-warning-ecological-mating-results
+          path: reports/ai2-eco-vigilance-report/
+          if-no-files-found: error
