@@ -13,7 +13,7 @@ const {Lab,SPECIES,BRAIN_SIZE}=require('../src/sim-core.js');
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const OFFSET=Number(process.argv[2]??0),COUNT=Number(process.argv[3]??2),BASE=Number(process.argv[4]??20560001);
 const MODEL=process.argv[5]??'baseline';
-assert.ok(['baseline','ecoMate','ecoMateWide','ecoMateHunger'].includes(MODEL));
+assert.ok(['baseline','ecoMate','ecoMateWide','ecoMateHunger','ecoVigilance'].includes(MODEL));
 assert.ok(Number.isInteger(OFFSET)&&OFFSET>=0&&Number.isInteger(COUNT)&&COUNT>=1&&COUNT<=10);
 assert.ok(Number.isInteger(BASE)&&BASE>0);
 const DAYS=[0,30,60,100],MODES=['evolve','clone','noninherited'],SAMPLE=8,DT=.08,ASSAY_DAYS=2.4;
