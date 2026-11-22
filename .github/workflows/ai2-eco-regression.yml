@@ -1,0 +1,25 @@
+name: AI2 ecological selection experimental regression
+on:
+  push:
+    branches:
+      - research/ai2-ecological-selection-20261123
+    paths:
+      - '.github/workflows/ai2-eco-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Existing core deterministic and ecology invariants
+        run: node tests/smoke.test.js
+      - name: Ecological mate choice, genetic recombination and peer warning checks
+        run: node tests/ai2-eco-selection-smoke.js
+      - name: Existing normal, AI1 and AI2 UI controls
+        run: node tests/ui-smoke.js
