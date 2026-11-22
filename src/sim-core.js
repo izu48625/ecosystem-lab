@@ -53,7 +53,7 @@
         mode:settings.mode==='social'?'social':settings.mode==='escape'?'escape':'normal',
         // Social ablation: identical AI2 predator avoidance without neighbour steering.
         socialEnabled:settings.socialEnabled!==false,
-        socialEvolution:['baseline','ecoMate','ecoMateWide','ecoMateHunger'].includes(settings.socialEvolution)?settings.socialEvolution:'baseline',
+        socialEvolution:['baseline','ecoMate','ecoMateWide','ecoMateHunger','ecoVigilance'].includes(settings.socialEvolution)?settings.socialEvolution:'baseline',
         socialNoMutation:settings.socialNoMutation===true,
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
@@ -379,6 +379,26 @@
         ax:dir?ax/dir:0,ay:dir?ay/dir:0,
         sx:repel?sx/repel:0,sy:repel?sy/repel:0,nearest};
     }
+    // True information flow: an animal can share the red predator it has
+    // personally seen in the last .3 day with nearby greens. No predator rules,
+    // HP, speeds, plant production or reproductive bonuses are changed.
+    socialSharedPredator(a,index,range=95){
+      const {cellSize,nx,ny,buckets}=index;
+      const minX=clamp(Math.floor((a.x-range)/cellSize),0,nx-1),maxX=clamp(Math.floor((a.x+range)/cellSize),0,nx-1);
+      const minY=clamp(Math.floor((a.y-range)/cellSize),0,ny-1),maxY=clamp(Math.floor((a.y+range)/cellSize),0,ny-1);
+      let best=null,closest=Infinity;
+      for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++)for(const b of buckets[y*nx+x]){
+        if(b===a||!b.alive||b.type!=='g'||!b.redSighted)continue;
+        if(this.day-b.redSighted.at>.32)continue;
+        if((a.x-b.x)**2+(a.y-b.y)**2>range**2)continue;
+        const predator=b.redSighted.predator;
+        if(!predator||!predator.alive||predator.type!=='r')continue;
+        const d=(a.x-predator.x)**2+(a.y-predator.y)**2;
+        if(d>(220*a.view)**2)continue;
+        if(d<closest){best=predator;closest=d}
+      }
+      return best;
+    }
     // Observable group: >=2 neighbours within 65 px. This is not a fitness reward.
     herdSnapshot(){
       const greens=this.entities.filter(e=>e.alive&&e.type==='g');
@@ -428,7 +448,15 @@
             clamp((e.x-W/2)/(W/2),-1,1),clamp((e.y-H/2)/(H/2),-1,1)
           ]):null;
           const dangerRange=(escapeAI?180:(e.energy<28?48:85))*e.view;
-          const danger=this.nearest(e,index,dangerRange,'r');
+          let danger=this.nearest(e,index,dangerRange,'r');
+          if(this.settings.socialEvolution==='ecoVigilance'&&socialAI&&this.settings.socialEnabled){
+            // Neighbours can warn only from their own previously observed threat.
+            if(danger)e.redSighted={predator:danger,at:this.day};
+            else if(socialGenes&&socialGenes[0]>-.25){
+              const shared=this.socialSharedPredator(e,index);
+              if(shared)danger=shared;
+            }
+          }
           if(escapeAI)this.aiEncounterObserve(e,danger);
           const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
@@ -448,11 +476,17 @@
             const hunger=(100-e.energy)/100;
             // The standard escape reflex provides a survivable founding policy.
             // The network evolves when to flee and which route/lateral dodge to take.
-            const alarm=proximity+urge*.33;
+            let alarm=proximity+urge*.33;
+            const receivedWarning=this.settings.socialEvolution==='ecoVigilance'&&
+              socialAI&&this.settings.socialEnabled&&distance>180*e.view;
+            // Alarm sharing is a behavioral information advantage that has a
+            // real foraging cost: warned animals leave grass to flee earlier.
+            if(receivedWarning)alarm=Math.max(alarm,.26);
             const policy=this.settings.escapePolicy;
-            const threshold=policy==='wide'?.25+hunger*.19:
+            let threshold=policy==='wide'?.25+hunger*.19:
               policy==='early'?.30+hunger*.22:
               policy==='guard'?.31+hunger*.22:.39+hunger*.25;
+            if(receivedWarning)threshold=Math.min(threshold,.20);
             this.stats.ai.threatDays+=dt;
             if(alarm>threshold){
               const dx=e.x-threat.x,dy=e.y-threat.y;
