@@ -251,7 +251,8 @@
           x0:e.x,y0:e.y,initialEnergy:e.energy,speed:e.speed,view:e.view,
           maxhp:e.maxhp,temperament:e.temperament,
           traits:this.auditNeuralTraits(e.genome),
-          lifeDays:0,foodEnergy:0,groupDays:0,neighborsDays:0,
+          lifeDays:0,foodEnergy:0,groupDays:0,neighborsDays:0,crowdDays:0,
+          headingAgreementSum:0,headingValidDays:0,
           redNearDays:0,fleeDays:0,lowEnergyDays:0,
           hitCount:0,encounterSurvived:0,deathReason:null,deathDay:null,
           owner:e};
@@ -415,6 +416,11 @@
             const observed=social||this.socialContext(e,index);
             if(observed.nearCount>=2)e.audit.groupDays+=dt;
             e.audit.neighborsDays+=observed.nearCount*dt;
+            if(observed.nearest<30)e.audit.crowdDays+=dt;
+            if(observed.count>0){
+              e.audit.headingAgreementSum+=dt*(Math.cos(e.angle)*observed.ax+Math.sin(e.angle)*observed.ay);
+              e.audit.headingValidDays+=dt;
+            }
           }
           const socialGenes=social?neuralForward(e.genome,[
             clamp((social.cx-e.x)/115,-1,1),clamp((social.cy-e.y)/115,-1,1),
