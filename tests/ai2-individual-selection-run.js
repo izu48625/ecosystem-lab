@@ -77,6 +77,8 @@ function runOne(seed,steer){
    foodPerDay:clean(a.foodEnergy/exposure),
    groupPct:clean(100*a.groupDays/exposure),
    neighborsPerDay:clean(a.neighborsDays/exposure),
+   crowdPct:clean(100*a.crowdDays/exposure),
+   headingAgreement:a.headingValidDays>0?clean(a.headingAgreementSum/a.headingValidDays):null,
    redNearPct:clean(100*a.redNearDays/exposure),
    fleePct:clean(100*a.fleeDays/exposure),
    lowEnergyPct:clean(100*a.lowEnergyDays/exposure),
