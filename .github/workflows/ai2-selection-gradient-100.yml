@@ -1,0 +1,53 @@
+name: AI2 100-seed founder selection-gradient audit
+on:
+  push:
+    branches:
+      - research/ai2-individual-selection-gradient-20261123
+    paths:
+      - '.github/workflows/ai2-selection-gradient-100.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  shard:
+    name: "worlds-${{ matrix.offset }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      max-parallel: 10
+      matrix:
+        offset: [0,10,20,30,40,50,60,70,80,90]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Audit one hundred matched 100-day ecosystems and founder family histories
+        run: node tests/ai2-individual-selection-run.js ${{ matrix.offset }} 10 20630001
+      - uses: actions/upload-artifact@v4
+        with:
+          name: founder-selection-${{ matrix.offset }}
+          path: reports/ai2-selection-gradient-raw/
+          if-no-files-found: error
+  aggregate:
+    needs: shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: founder-selection-*
+          path: reports/ai2-selection-gradient-raw/
+          merge-multiple: true
+      - name: Quantify gene-trait behavior and fitness selection, controlling founder conditions
+        run: node tests/ai2-individual-selection-aggregate.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-founder-selection-gradient-100-seed-report
+          path: reports/ai2-selection-gradient-summary/
+          if-no-files-found: error

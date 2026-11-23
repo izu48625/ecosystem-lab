@@ -1,0 +1,28 @@
+name: AI2 individual neural selection-gradient pilot
+on:
+  push:
+    branches:
+      - research/ai2-individual-selection-gradient-20261123
+    paths:
+      - '.github/workflows/ai2-selection-gradient-pilot.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run one matched green lifetime and founder genotype selection audit
+        run: |
+          node tests/ai2-individual-selection-run.js 0 1 20630001
+          node -e "const x=require('./reports/ai2-selection-gradient-raw/shard-0.json').results[0];for(const mode of ['enabled','disabled']) {const z=x[mode]; const f=z.founders; console.log('AUDIT_PILOT',mode,JSON.stringify({ecology:z.ecology,founders:f.length,meanBirths:f.reduce((a,b)=>a+b.births,0)/f.length,meanGroup:f.reduce((a,b)=>a+b.groupPct,0)/f.length,meanFood:f.reduce((a,b)=>a+b.foodPerDay,0)/f.length,meanCrowd:f.reduce((a,b)=>a+b.crowdPct,0)/f.length,meanAligned:f.reduce((a,b)=>a+(b.headingAgreement||0),0)/f.length,rich:f.slice(0,2),checkpoints:z.checkpoints[100]}))}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ai2-selection-one-seed-pilot
+          path: reports/ai2-selection-gradient-raw/
+          if-no-files-found: error
