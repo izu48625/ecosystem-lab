@@ -53,6 +53,8 @@
         mode:settings.mode==='social'?'social':settings.mode==='escape'?'escape':'normal',
         // Social ablation: identical AI2 predator avoidance without neighbour steering.
         socialEnabled:settings.socialEnabled!==false,
+        // Research-only observer, never used by ecology decisions or reproduction.
+        socialAudit:settings.socialAudit===true,
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
@@ -61,7 +63,7 @@
       };
       this.seed=this.settings.seed||1;this.day=0;this.nextId=0;this.entities=[];
       this.grass=Array.from({length:GRID_X*GRID_Y},()=>this.rand(.5,1));
-      this.history=[];this.events=[];this.effects=[];
+      this.history=[];this.events=[];this.effects=[];this.auditPeople=[];
       this.stats={births:{g:0,r:0,b:0},deaths:{g:{hunt:0,starve:0,age:0,defense:0},r:{hunt:0,starve:0,age:0,defense:0},b:{hunt:0,starve:0,age:0,defense:0}},kills:{r:0,b:0},hunts:{r:0,b:0},strikes:{r:0,b:0},counters:0,
         // Exposure is the total time spent alive by all members of each species.
         individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0},ai:{founders:0,offspring:0,mutatedOffspring:0,mutatedGenes:0,highestGeneration:0,threatDays:0,fleeDays:0,riskDays:0,
@@ -160,6 +162,7 @@
       const field={survived:'encounterSurvived',hit:'encounterHit',diedOther:'encounterDiedOther'}[outcome];
       if(!field)throw new Error('Unknown encounter result: '+outcome);
       ai[field]++;group[field]++;
+      if(outcome==='survived'&&green.audit)green.audit.encounterSurvived++;
       this.aiLog({
         day:Number(this.day.toFixed(3)),kind:'red_proximity_end',
         greenId:green.id,generation:green.generation,redId:episode.redId,
@@ -203,7 +206,29 @@
       if(!green.aiEncounter && !green.aiThreatNear){
         this.aiEncounterStart(green,red,Math.hypot(green.x-red.x,green.y-red.y));
       }
+      if(green.audit)green.audit.hitCount++;
       if(green.aiEncounter)this.aiEncounterFinish(green,'hit');
+    }
+    // Fixed sensory stimuli describe genetic tendencies, not performance.
+    // Averaging imposed NN social gains does NOT prove natural adaptive evolution.
+    auditNeuralTraits(genome){
+      const scenes=[
+        [.72,.12,.8,.2,.35,.7,.85,.7,0,0],
+        [-.65,.32,.75,.5,.55,.22,.66,.5,.1,-.2],
+        [.43,-.38,-.6,.8,.8,.4,.7,.75,-.2,.1],
+        [-.4,-.2,.6,-.5,.35,.55,.72,.45,-.3,.1]
+      ];
+      const avg=[0,0,0];
+      for(const inputs of scenes){
+        const out=neuralForward(genome,inputs);
+        for(let i=0;i<3;i++)avg[i]+=out[i]/scenes.length;
+      }
+      return {
+        gather:Math.max(0,.16+avg[0]*2.5),
+        align:Math.max(0,.12+avg[1]*2),
+        separate:Math.max(0,.34+avg[2]*2.2),
+        rawGather:avg[0],rawAlign:avg[1],rawSeparate:avg[2]
+      };
     }
     spawn(type,x,y,initial=false,parent=null){
       const t=SPECIES[type], variation=()=>1+this.rand(-this.settings.variance,this.settings.variance);
@@ -218,6 +243,19 @@
         if(!parent)this.stats.ai.founders++;
         this.stats.ai.highestGeneration=Math.max(this.stats.ai.highestGeneration,e.generation);
         this.aiGeneration(e.generation).born++;
+      }
+      if(type==='g'&&this.settings.mode==='social'&&this.settings.socialAudit){
+        const a={id:e.id,parentId:parent?parent.id:null,
+          rootId:parent?.audit?parent.audit.rootId:e.id,
+          bornDay:this.day,generation:e.generation,initialAge:e.age,
+          x0:e.x,y0:e.y,initialEnergy:e.energy,speed:e.speed,view:e.view,
+          maxhp:e.maxhp,temperament:e.temperament,
+          traits:this.auditNeuralTraits(e.genome),
+          lifeDays:0,foodEnergy:0,groupDays:0,neighborsDays:0,
+          redNearDays:0,fleeDays:0,lowEnergyDays:0,
+          hitCount:0,encounterSurvived:0,deathReason:null,deathDay:null,
+          owner:e};
+        e.audit=a;this.auditPeople.push(a);
       }
       this.entities.push(e);return e;
     }
@@ -260,6 +298,7 @@
       if(this.settings.mode!=='normal'&&a.type==='g'&&a.aiEncounter)
         this.aiEncounterFinish(a,'diedOther');
       a.alive=false;this.stats.deaths[a.type][reason]++;
+      if(a.audit){a.audit.deathReason=reason;a.audit.deathDay=this.day;}
       if(this.settings.mode!=='normal'&&a.type==='r')this.aiChaseFinish(a,'other','red_died');
       if(reason==='starve'){
         // Global grass alone cannot indicate whether an individual could reach food.
@@ -360,6 +399,7 @@
         if(!e.alive)continue;
         const t=SPECIES[e.type];
         this.stats.individualDays[e.type]+=dt;
+        if(e.audit){e.audit.lifeDays+=dt;if(e.energy<35)e.audit.lowEnergyDays+=dt;}
         e.age+=dt;e.energy-=dt*t.drain*(e.age<t.mature?.46:1);
         if(e.age>=e.life){this.die(e,'age');continue}
         // Hunger is checked *after* a foraging/hunting opportunity this tick.
@@ -371,6 +411,11 @@
           const escapeAI=this.settings.mode!=='normal',socialAI=this.settings.mode==='social';
           const social=socialAI&&this.settings.socialEnabled?this.socialContext(e,index):null;
           if(socialAI)e.socialNeighbors=social?.nearCount||0;
+          if(e.audit){
+            const observed=social||this.socialContext(e,index);
+            if(observed.count>=2)e.audit.groupDays+=dt;
+            e.audit.neighborsDays+=observed.count*dt;
+          }
           const socialGenes=social?neuralForward(e.genome,[
             clamp((social.cx-e.x)/115,-1,1),clamp((social.cy-e.y)/115,-1,1),
             social.ax,social.ay,clamp(social.count/12,0,1),
@@ -383,6 +428,7 @@
           if(escapeAI)this.aiEncounterObserve(e,danger);
           const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
+          if(e.audit&&threat&&threat.type==='r')e.audit.redNearDays+=dt;
           let fleeing=false;
           if(threat&&escapeAI){
             const distance=Math.max(.01,Math.hypot(e.x-threat.x,e.y-threat.y));
@@ -431,6 +477,7 @@
             this.move(e,dx-.12*dy,dy+.12*dx,dt,149*e.speed*(e.temperament==='timid'?1.13:1),0,'flee');
             fleeing=true;
           }
+          if(e.audit&&fleeing)e.audit.fleeDays+=dt;
           if(!fleeing){
             if(escapeAI)e.aiFleeActive=false;
             const gi=this.gridIndex(e.x,e.y);let food=this.grass[gi],tx=null,ty=null;
@@ -452,7 +499,10 @@
             this.move(e,dx,dy,dt,55*e.speed,0,'wander');
           }
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
-          if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
+          if(amount>0){
+            if(e.audit)e.audit.foodEnergy+=Math.min(100-e.energy,amount*92);
+            this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)
+          }
         }else{
           const needsFood=e.energy<(e.type==='r'?55:64);
           let target=null;
