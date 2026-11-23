@@ -413,8 +413,8 @@
           if(socialAI)e.socialNeighbors=social?.nearCount||0;
           if(e.audit){
             const observed=social||this.socialContext(e,index);
-            if(observed.count>=2)e.audit.groupDays+=dt;
-            e.audit.neighborsDays+=observed.count*dt;
+            if(observed.nearCount>=2)e.audit.groupDays+=dt;
+            e.audit.neighborsDays+=observed.nearCount*dt;
           }
           const socialGenes=social?neuralForward(e.genome,[
             clamp((social.cx-e.x)/115,-1,1),clamp((social.cy-e.y)/115,-1,1),
