@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import json, time, os, pathlib, subprocess
+import json, time, os, pathlib
+from mutagen.mp3 import MP3
 from gtts import gTTS
 
 root=pathlib.Path('video-production')
@@ -17,8 +18,7 @@ for row in scenes:
             print('TTS retry',row['id'],attempt,repr(e),flush=True)
             if attempt>=3:raise
             time.sleep(2+attempt)
-    p=subprocess.run(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(file)],capture_output=True,text=True)
-    duration=float(p.stdout.strip()) if p.returncode==0 else None
+    duration=MP3(file).info.length
     audios.append({'id':row['id'],'path':file.name,'duration':duration,'title':row['title']})
     print('TTS',row['id'],file.stat().st_size,'duration',duration,flush=True)
 (root/'voice-manifest.json').write_text(json.dumps(audios,ensure_ascii=False,indent=2))
