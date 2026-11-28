@@ -5,6 +5,7 @@ Pure visualization; no simulation rules are changed or synthesized.
 import json
 import math
 import subprocess
+import imageio_ffmpeg
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
@@ -124,7 +125,7 @@ def frame_image(row,seen):
     return im
 
 OUTPUT.parent.mkdir(parents=True,exist_ok=True)
-cmd=['ffmpeg','-y','-hide_banner','-loglevel','error','-f','rawvideo','-pix_fmt','rgb24',
+cmd=[imageio_ffmpeg.get_ffmpeg_exe(),'-y','-hide_banner','-loglevel','error','-f','rawvideo','-pix_fmt','rgb24',
      '-s',f'{W}x{H}','-r',str(FPS),'-i','pipe:0',
      '-c:v','libx264','-preset','veryfast','-crf','22',
      '-pix_fmt','yuv420p','-movflags','+faststart',str(OUTPUT)]
