@@ -4,13 +4,15 @@
 const $=id=>document.getElementById(id), {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL}=window.EcosystemCore;
 const cv=$('world'),c=cv.getContext('2d'),pop=$('chart'),popCtx=pop.getContext('2d'),pred=$('predChart'),predCtx=pred.getContext('2d');
 const CHECKPOINT_DAY=100;
-const video=window.EcosystemVideo;
+const video=window.EcosystemVideo, family=window.EcosystemLineage, batchStudio=window.EcosystemBatch;
+let activeFamilyId=null,lastFamilyLab=null,lastFamilyDay=-1,lastFamilyRecordCount=-1;
+let batchStudy=null,batchRunning=false,batchAbort=false;
 let videoComparison=null,videoCompareRunning=false,lastVideoLab=null,lastVideoLength=-1,lastVideoGraph='',lastVideoComparison=null;
 let lab,playing=true,ended=false,checkpointPassed=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0,activeTab='normal';
 const worlds={normal:null,ai1:null,ai2:null};
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
-function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value),duration:Infinity,mode:activeTab==='ai1'?'escape':activeTab==='ai2'?'social':'normal'}}
-function reset(){lab=new Lab(options());playing=true;ended=false;checkpointPassed=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};show();draw();drawCharts()}
+function options(){return {seed:Number($('seed').value)||1,green:Number($('startg').value),red:Number($('startr').value),blue:0,variance:Number($('variance').value),regrowth:Number($('regrowth').value),duration:Infinity,trackLineages:true,mode:activeTab==='ai1'?'escape':activeTab==='ai2'?'social':'normal'}}
+function reset(){lab=new Lab(options());playing=true;ended=false;checkpointPassed=false;accum=0;focus=null;zoom=1;cam={x:W/2,y:H/2};activeFamilyId=null;lastFamilyLab=null;show();draw();drawCharts();drawFamily(true)}
 function creature(e){
  c.save();c.translate(e.x,e.y);c.rotate(e.angle);const sz=e.type==='g'?.88:e.type==='r'?1.08:1.22;c.scale(sz,sz);
  c.fillStyle='#08161399';c.beginPath();c.ellipse(1,4,12,8,0,0,Math.PI*2);c.fill();
@@ -70,7 +72,83 @@ function chartDraw(canvas,ctx,keys){
    visible.forEach((n,i)=>{if(!i)ctx.moveTo(px(n.day),py(n[k]));else ctx.lineTo(px(n.day),py(n[k]))});ctx.stroke()}
  ctx.strokeStyle='#d4efda88';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(px(lab.day),top);ctx.lineTo(px(lab.day),h-bottom);ctx.stroke();ctx.setLineDash([]);
 }
-function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r']);drawVideo()}
+function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r']);drawVideo();drawFamily()}
+
+function drawFamily(force=false){
+ if(!family||!lab?.settings.trackLineages)return;
+ const day=Math.floor(lab.day),n=lab.lineageRecords.size;
+ if(!force&&lastFamilyLab===lab&&lastFamilyDay===day&&lastFamilyRecordCount===n)return;
+ lastFamilyLab=lab;lastFamilyDay=day;lastFamilyRecordCount=n;
+ const detail=activeFamilyId===null?null:lab.lineageDetail(activeFamilyId);
+ family.paint($('lineageCanvas'),detail,lab);
+ if(activeFamilyId!==null&&!detail){
+  $('lineageStatus').textContent='緑の個体 #'+activeFamilyId+' の記録がありません。このシードの緑の番号を入力してください。';
+  $('lineageDetails').innerHTML='';
+ }else if(detail){
+  const p=detail.person,rate=(a)=>p.lifeDays?(100*a/p.lifeDays).toFixed(1)+'%':'—';
+  const val=x=>Number(x).toFixed(2);
+  const traits=p.traits?
+   '集合 '+val(p.traits.gather)+' ／方向同調 '+val(p.traits.align)+' ／密集回避 '+val(p.traits.separate):
+   'ノーマル：遺伝型ニューラルネットワークなし';
+  const parent=p.parentId?'親 #'+p.parentId:'初代（親なし）';
+  $('lineageStatus').textContent='緑 #'+p.id+'（'+p.generation+'世代）｜'+parent+'｜初代家系 #'+p.rootId+
+   '｜'+(p.alive?'生存中':'死亡：'+p.death+' DAY'+p.deathDay)+
+   '\n遺伝的傾向：'+traits+'。親子は母系継承を表示しています。';
+  $('lineageDetails').innerHTML=
+   '<div><strong>採食と寿命</strong><small>累積採食エネルギー：'+val(p.foodEnergy)+
+   '<br>生存期間：'+val(p.lifeDays)+'日<br>低エネルギー時間：'+rate(p.lowEnergyDays)+'</small></div>'+
+   '<div><strong>捕食と群れ</strong><small>赤の攻撃：'+p.hitCount+'回'+
+   '<br>群れ参加：'+(lab.settings.mode==='social'?rate(p.groupDays):'対象外')+
+   '<br>密集時間：'+(lab.settings.mode==='social'?rate(p.crowdDays):'対象外')+'</small></div>'+
+   '<div><strong>親子・系統</strong><small>直接の子：'+p.children.length+'匹'+
+   '<br>その個体の直系子孫：'+detail.descendantsTotal+'匹（生存 '+detail.descendantsAlive+'）'+
+   '<br>初代 #'+p.rootId+' の一族：'+detail.familyTotal+'匹（生存 '+detail.familyAlive+'）</small></div>';
+ }else{
+  $('lineageStatus').textContent='緑をタップして選択するか、個体番号を入力してください。死亡後の記録も検索できます。';
+  $('lineageDetails').innerHTML='';
+ }
+ // Rebuild a small selector of surviving founder families; never dump thousands of records in DOM.
+ const previous=$('lineageSuggested').value;
+ const leaders=lab.lineageLeaders(12);
+ $('lineageSuggested').innerHTML='<option value="">生存家系トップ '+leaders.length+'件…</option>'+
+  leaders.map(x=>'<option value="'+x.rootId+'">初代 #'+x.rootId+'｜生存'+x.alive+
+   '匹｜最大'+x.maxGeneration+'世代</option>').join('');
+ if(leaders.some(x=>String(x.rootId)===String(previous)))$('lineageSuggested').value=previous;
+ $('lineageChildren').innerHTML='<option value="">直接の子を選択…</option>'+
+  (detail?.directChildren||[]).slice(0,80).map(child=>
+   '<option value="'+child.id+'">緑 #'+child.id+'（第'+child.generation+'世代・'+
+   (child.alive?'生存':'死亡')+'）</option>').join('');
+ $('lineageGoParent').disabled=!detail?.person?.parentId;
+}
+function chooseFamily(id){
+ const n=Math.floor(Number(id));if(!Number.isFinite(n)||n<=0){$('lineageStatus').textContent='正しい緑の個体番号を入力してください。';return}
+ activeFamilyId=n;$('lineageId').value=n;drawFamily(true);
+}
+function downloadLocalCsv(contents,name){
+ const blob=new Blob([contents],{type:'text/csv;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+function drawBatch(){
+ batchStudio.paint($('batchCanvas'),batchStudy,$('batchGraph').value||'green');
+}
+function renderBatchStats(){
+ if(!batchStudy?.complete){$('batchSummary').innerHTML='';drawBatch();return}
+ const data=batchStudio.summary(batchStudy);
+ $('batchSummary').innerHTML=batchStudy.modes.map(mode=>{
+  const m=data[mode],name=video.modeLabel(mode);
+  return '<div><strong>'+name+'｜'+m.n+'シード</strong><small>'+
+   '緑最終平均 '+m.green.toFixed(1)+'匹（p10〜p90：'+m.greenP10.toFixed(1)+'〜'+m.greenP90.toFixed(1)+'）'+
+   '<br>緑存続 '+m.survived+'/'+m.n+'、赤緑共存 '+m.coexist+'/'+m.n+
+   '<br>緑の出生 '+m.births.toFixed(1)+'件、捕食死 '+m.hunted.toFixed(1)+'件、餓死 '+m.starved.toFixed(1)+'件</small></div>';
+ }).join('');
+ if(data.paired){
+  $('batchStatus').textContent+='\\nAI②−AI①の緑最終頭数（対応シード平均）：'+data.paired.mean.toFixed(1)+
+   '匹、95%ブートストラップ区間 '+data.paired.ci95[0].toFixed(1)+'〜'+data.paired.ci95[1].toFixed(1)+'匹';
+ }
+ drawBatch();
+}
+
 function videoSelection(){return $('videoGraphSelect').value||'population'}
 function validVideoComparison(){
  return videoComparison&&videoComparison.signature===video.signature(options())?videoComparison:null;
@@ -264,6 +342,92 @@ $('videoRunCompare').onclick=async()=>{
   if(videoComparison&&videoComparison.signature===video.signature(options()))drawVideo(true);
  }
 };
+
+$('lineageSearch').onclick=()=>chooseFamily($('lineageId').value);
+$('lineageGoParent').onclick=()=>{
+ const id=lab.lineageDetail(activeFamilyId)?.person?.parentId;
+ if(id)chooseFamily(id);
+};
+$('lineageChildren').onchange=()=>{
+ if($('lineageChildren').value)chooseFamily($('lineageChildren').value);
+};
+$('lineageFromSelection').onclick=()=>{
+ const e=lab.entities.find(x=>x.id===focus&&x.alive&&x.type==='g');
+ if(e)chooseFamily(e.id);
+ else $('lineageStatus').textContent='先に緑の個体をタップして選択してください。';
+};
+$('lineageSuggested').onchange=()=>{if($('lineageSuggested').value)chooseFamily($('lineageSuggested').value)};
+$('lineageSavePng').onclick=()=>{
+ drawFamily(true);
+ if(!lab.lineageDetail(activeFamilyId)){$('lineageStatus').textContent='先に個体を選択してください。';return}
+ video.download($('lineageCanvas'),'ecosystem_family_'+lab.settings.mode+'_seed'+lab.settings.seed+'_id'+activeFamilyId+'.png');
+};
+$('lineageSaveCsv').onclick=()=>{
+ const detail=lab.lineageDetail(activeFamilyId);
+ if(!detail){$('lineageStatus').textContent='先に個体を選択してください。';return}
+ downloadLocalCsv(family.csv(detail),'ecosystem_family_seed'+lab.settings.seed+'_id'+activeFamilyId+'.csv');
+};
+$('batchGraph').onchange=drawBatch;
+$('batchSavePng').onclick=()=>{
+ if(!batchStudy?.complete){$('batchStatus').textContent='一括統計を実行してください。';return}
+ drawBatch();video.download($('batchCanvas'),'ecosystem_batch_'+$('batchGraph').value+'_'+batchStudy.count+'seeds.png');
+};
+$('batchSaveCsv').onclick=()=>{
+ if(!batchStudy?.complete){$('batchStatus').textContent='一括統計を実行してください。';return}
+ downloadLocalCsv(batchStudio.csv(batchStudy,$('batchGraph').value),'ecosystem_batch_'+$('batchGraph').value+'.csv');
+};
+$('batchSaveSeedCsv').onclick=()=>{
+ if(!batchStudy?.complete){$('batchStatus').textContent='一括統計を実行してください。';return}
+ downloadLocalCsv(batchStudio.summaryCsv(batchStudy),'ecosystem_batch_all_seed_results.csv');
+};
+$('batchCancel').onclick=()=>{batchAbort=true;$('batchStatus').textContent='集計を中止しています。ここまでの不完全な結果は採用しません。'};
+$('batchRun').onclick=async()=>{
+ if(batchRunning)return;
+ const count=Number($('batchCount').value),scope=$('batchScope').value;
+ const modes=scope==='social'?['social']:['normal','escape','social'];
+ const pref=options(),origLab=lab,oldPlaying=playing;
+ const study=batchStudio.createStudy({baseSeed:pref.seed,count,settings:pref,modes});
+ batchRunning=true;batchAbort=false;batchStudy=null;playing=false;
+ $('batchRun').disabled=true;$('batchCancel').disabled=false;
+ $('batchSummary').innerHTML='';
+ let finished=0;
+ try{
+  for(let i=0;i<count&&!batchAbort;i++){
+   for(const mode of modes){
+    if(batchAbort)break;
+    const world=new Lab({...pref,seed:pref.seed+i,mode,duration:100,trackLineages:false});
+    world.aiLog=function(){};
+    for(let day=10;day<=100;day+=10){
+     if(batchAbort)break;
+     world.run(day,.08);
+     $('batchStatus').textContent='同一シード比較：'+(i+1)+'/'+count+'シード、'+video.modeLabel(mode)+
+      ' DAY'+day+'/100\\n完了 '+finished+'/'+(count*modes.length)+' 世界。端末の性能によって時間がかかります。';
+     // Give mobile browsers a chance to paint and process cancel taps.
+     await new Promise(resolve=>setTimeout(resolve,0));
+    }
+    if(!batchAbort){batchStudio.ingest(study,mode,world);finished++}
+   }
+  }
+  if(batchAbort){
+   $('batchStatus').textContent='計算を中止しました。完了していない試行は統計結果として使用しません。';
+  }else{
+   batchStudy=batchStudio.finish(study);
+   $('batchStatus').textContent='完了：'+batchStudy.count+'組、'+modes.length+'モード。'+
+    (batchStudy.count*modes.length)+'世界×100日を同じ条件で実行しました。'+
+    '\\nシード範囲 '+pref.seed+'〜'+(pref.seed+count-1)+
+    '。平均線とシードの10〜90%幅をグラフで確認できます。';
+   renderBatchStats();
+  }
+ }catch(error){
+  $('batchStatus').textContent='集計エラー：データを採用しません。端末の空きメモリや設定を確認してください。';
+  console.error('Multi-seed analytics failed',error);
+ }finally{
+  batchRunning=false;$('batchRun').disabled=false;$('batchCancel').disabled=true;
+  if(lab===origLab)playing=oldPlaying&&!ended;
+  show();
+ }
+};
+
 $('escapeCsv').onclick=exportEscapeCSV;
 $('openReport').onclick=()=>{
  playing=false;accum=0;show();
@@ -319,5 +483,5 @@ $('batch').onclick=async()=>{
   btn.disabled=false;playing=wasPlaying&&!ended;
  }
 };
-reset();drawVideo(true);requestAnimationFrame(frame);
+reset();drawVideo(true);drawFamily(true);drawBatch();requestAnimationFrame(frame);
 })();
