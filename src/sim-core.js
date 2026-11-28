@@ -232,11 +232,25 @@
       const meanDangerSignal=this.settings.mode!=='normal'&&aliveGreen.length?
         aliveGreen.reduce((sum,e)=>sum+neuralForward(e.genome,reference)[2],0)/aliveGreen.length:0;
       const herd=this.settings.mode==='social'?this.herdSnapshot():null;
-      this.history.push({day:d,...n,...(herd?{
+      const genes=this.settings.mode==='social'?this.socialGeneSnapshot(aliveGreen):null;
+      this.history.push({day:d,...n,
+        // Daily cumulative counters are kept separately from display deltas.
+        birthg:this.stats.births.g,birthr:this.stats.births.r,
+        huntg:this.stats.deaths.g.hunt,starveg:this.stats.deaths.g.starve,
+        ageg:this.stats.deaths.g.age,starver:this.stats.deaths.r.starve,
+        killsr:this.stats.kills.r,huntsr:this.stats.hunts.r,
+        redIndividualDays:Number(this.stats.individualDays.r.toFixed(3)),
+        ...(genes?{
+          ai2GeneGather:genes.gather,ai2GeneAlign:genes.align,
+          ai2GeneSeparate:genes.separate
+        }:{}),
+        ...(herd?{
         ai2GroupedPct:Number(herd.groupedPct.toFixed(2)),
         ai2MeanNeighbors:Number(herd.meanNeighbors.toFixed(2)),
         ai2MaxLocalGroup:herd.maxLocalGroup,
-        ai2MeanNearest:Number(herd.meanNearest.toFixed(1))
+        ai2MeanNearest:Number(herd.meanNearest.toFixed(1)),
+        ai2LargestConnectedPct:Number(herd.largestConnectedPct.toFixed(2)),
+        ai2HeadingAlignment:herd.headingAlignment===null?null:Number(herd.headingAlignment.toFixed(4))
       }:{}),aiMeanGeneration:Number(meanGeneration.toFixed(3)),aiEscapeBias:Number(meanDangerSignal.toFixed(3)),aiOffspring:ai.offspring,aiMutated:ai.mutatedOffspring,aiFleeDays:Number(ai.fleeDays.toFixed(2)),
         aiFleeStarts:ai.fleeStarts,
         aiMeanFleeStartDistance:ai.fleeStarts?Number((ai.startDistanceSum/ai.fleeStarts).toFixed(2)):null,
@@ -332,18 +346,68 @@
         sx:repel?sx/repel:0,sy:repel?sy/repel:0,nearest};
     }
     // Observable group: >=2 neighbours within 65 px. This is not a fitness reward.
+    // Day-only measurement for documentary graphs. It never feeds back into movement.
+    // "Largest herd" is the connected component of pairs <65px apart, not a
+    // local neighbour count. Angle similarity uses pairwise cosine.
     herdSnapshot(){
       const greens=this.entities.filter(e=>e.alive&&e.type==='g');
-      if(!greens.length)return {groupedPct:0,meanNeighbors:0,maxLocalGroup:0,meanNearest:0};
-      const index=this.buildIndex();let group=0,sum=0,max=1,near=0;
-      for(const e of greens){
-        const local=this.socialContext(e,index,65);
+      if(!greens.length)return {groupedPct:0,meanNeighbors:0,maxLocalGroup:0,
+        meanNearest:0,largestConnectedPct:0,headingAlignment:null};
+      const index=this.buildIndex(),size=greens.length;
+      const parent=Array.from({length:size},(_,i)=>i),sizes=new Array(size).fill(1);
+      const find=i=>{while(parent[i]!==i){parent[i]=parent[parent[i]];i=parent[i]}return i};
+      const union=(i,j)=>{let x=find(i),y=find(j);if(x===y)return;
+        if(sizes[x]<sizes[y]){const t=x;x=y;y=t}
+        parent[y]=x;sizes[x]+=sizes[y]};
+      const ids=new Map(greens.map((e,i)=>[e.id,i]));
+      let group=0,sum=0,max=1,near=0,pairs=0,headingSum=0;
+      const radius=65;
+      for(let i=0;i<size;i++){
+        const a=greens[i],local=this.socialContext(a,index,radius);
         sum+=local.count;max=Math.max(max,local.count+1);
         near+=local.nearest;
         if(local.count>=2)group++;
+        const {cellSize,nx,ny,buckets}=index;
+        const fromX=clamp(Math.floor((a.x-radius)/cellSize),0,nx-1),toX=clamp(Math.floor((a.x+radius)/cellSize),0,nx-1);
+        const fromY=clamp(Math.floor((a.y-radius)/cellSize),0,ny-1),toY=clamp(Math.floor((a.y+radius)/cellSize),0,ny-1);
+        for(let y=fromY;y<=toY;y++)for(let x=fromX;x<=toX;x++)for(const b of buckets[y*nx+x]){
+          const j=ids.get(b.id);
+          if(j===undefined||j<=i||!b.alive)continue;
+          const dx=a.x-b.x,dy=a.y-b.y;
+          if(dx*dx+dy*dy>=radius*radius)continue;
+          union(i,j);headingSum+=Math.cos(a.angle-b.angle);pairs++;
+        }
       }
-      return {groupedPct:100*group/greens.length,meanNeighbors:sum/greens.length,
-        maxLocalGroup:max,meanNearest:near/greens.length};
+      const largest=sizes.reduce((m,_,i)=>parent[i]===i?Math.max(m,sizes[i]):m,1);
+      return {groupedPct:100*group/size,meanNeighbors:sum/size,
+        maxLocalGroup:max,meanNearest:near/size,
+        largestConnectedPct:100*largest/size,
+        headingAlignment:pairs?headingSum/pairs:null};
+    }
+    // Standardized neural outputs, identical input stimuli across DAY0...DAY100.
+    // This measures genetic tendencies among CURRENTLY living greens. It does
+    // not test lifelong performance and is not automatically "skill improved".
+    socialGeneSnapshot(greens){
+      if(!greens.length)return {gather:null,align:null,separate:null};
+      const stimuli=[
+        [.72,.12,.8,.2,.35,.7,.85,.7,0,0],
+        [-.65,.32,.75,.5,.55,.22,.66,.5,.1,-.2],
+        [.43,-.38,-.6,.8,.8,.4,.7,.75,-.2,.1],
+        [-.4,-.2,.6,-.5,.35,.55,.72,.45,-.3,.1]
+      ];
+      let gather=0,align=0,separate=0;
+      for(const e of greens){
+        let a=0,b=0,c=0;
+        for(const stimulus of stimuli){
+          const out=neuralForward(e.genome,stimulus);
+          a+=out[0];b+=out[1];c+=out[2];
+        }
+        gather+=Math.max(0,.16+(a/4)*2.5);
+        align+=Math.max(0,.12+(b/4)*2);
+        separate+=Math.max(0,.34+(c/4)*2.2);
+      }
+      const round=v=>Number((v/greens.length).toFixed(4));
+      return {gather:round(gather),align:round(align),separate:round(separate)};
     }
     update(dt=.05){
       if(this.day>=this.settings.duration)return;      dt=Math.min(dt,this.settings.duration-this.day);

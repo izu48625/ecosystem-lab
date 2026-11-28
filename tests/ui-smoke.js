@@ -12,10 +12,10 @@ for(const file of ['../src/ui.js','../src/report.js']){
 
 const noop=()=>{};
 const context2d=new Proxy({}, {get:(target,key)=>target[key]??noop,set:(target,key,val)=>(target[key]=val,true)});
-const values={seed:20261117,startg:100,startr:20,startb:0,variance:10,regrowth:100};
+const values={seed:20261117,startg:100,startr:20,startb:0,variance:10,regrowth:100,videoGraphSelect:'population'};
 const elements=new Map();
 function element(id){
- if(!elements.has(id))elements.set(id,{id,value:values[id]??0,textContent:'',style:{},hidden:false,attributes:{},setAttribute(n,v){this.attributes[n]=v},disabled:false,onclick:null,oninput:null,addEventListener:noop,click:noop,getBoundingClientRect:()=>({left:0,top:0,width:960,height:600}),getContext:()=>context2d});
+ if(!elements.has(id))elements.set(id,{id,value:values[id]??0,textContent:'',style:{},hidden:false,attributes:{},setAttribute(n,v){this.attributes[n]=v},disabled:false,onclick:null,oninput:null,addEventListener:noop,click:noop,getBoundingClientRect:()=>({left:0,top:0,width:960,height:600}),getContext:()=>context2d,toBlob:cb=>cb({type:'image/png'})});
  return elements.get(id);
 }
 const speedButtons=[1,5,20].map(v=>({dataset:{s:String(v)},classList:{toggle:noop},onclick:null}));
@@ -31,8 +31,15 @@ let requested=0,nextFrame=null;
 const appContext={document:dom,window:{EcosystemCore},requestAnimationFrame:fn=>{requested++;nextFrame=fn},setTimeout:noop,URL:{createObjectURL:()=>'',revokeObjectURL:noop},Blob:class{},console,Math,Number};
 vm.createContext(appContext);
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/report.js'),'utf8'),appContext);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/video-lab.js'),'utf8'),appContext);
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/ui.js'),'utf8'),appContext);
 assert.equal(element('ng').textContent,100);assert.equal(element('nr').textContent,20);assert.equal(element('nb').textContent,0);assert.ok(requested>0);
+assert.ok(element('videoInfo').textContent.includes('DAY 0.0'),'Video chart starts at live seed DAY0');
+element('videoSavePng').onclick();
+assert.equal(pngDownloads,1,'Video canvas exports PNG without pausing or changing world');
+element('videoSaveCsv').onclick();
+assert.equal(pngDownloads,2,'Video chart CSV exports through the local browser');
+
 element('tabButtonAi1').onclick();
 assert.equal(element('view-normal').hidden,true);
 assert.equal(element('view-ai1').hidden,false);
@@ -109,6 +116,14 @@ assert.ok(element('day').textContent.includes('DAY 1.0'),'AI② controls advance
 element('jump100').onclick();
 assert.ok(element('day').textContent.includes('DAY 100.0'),'AI② stops at its DAY100');
 assert.ok(element('ai2Grouped').textContent.endsWith('%'));
+element('videoGraphSelect').value='genes';
+element('videoGraphSelect').onchange();
+assert.ok(element('videoInfo').textContent.includes('集合'),'AI② phenotype chart displays day0 → day100 inherited NN means');
+element('videoGraphSelect').value='herd';
+element('videoGraphSelect').onchange();
+assert.ok(element('videoInfo').textContent.includes('最大連結群'),'AI② herd chart shows connected-group metric');
+element('videoSavePng').onclick();
+element('videoSaveCsv').onclick();
 element('tabButtonAi1').onclick();
 assert.ok(element('day').textContent.includes('DAY 100.0'),'Switching tabs restores independent AI world');
 element('toggle').onclick();
