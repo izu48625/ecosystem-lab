@@ -114,6 +114,11 @@ function drawFamily(force=false){
   leaders.map(x=>'<option value="'+x.rootId+'">初代 #'+x.rootId+'｜生存'+x.alive+
    '匹｜最大'+x.maxGeneration+'世代</option>').join('');
  if(leaders.some(x=>String(x.rootId)===String(previous)))$('lineageSuggested').value=previous;
+ $('lineageChildren').innerHTML='<option value="">直接の子を選択…</option>'+
+  (detail?.directChildren||[]).slice(0,80).map(child=>
+   '<option value="'+child.id+'">緑 #'+child.id+'（第'+child.generation+'世代・'+
+   (child.alive?'生存':'死亡')+'）</option>').join('');
+ $('lineageGoParent').disabled=!detail?.person?.parentId;
 }
 function chooseFamily(id){
  const n=Math.floor(Number(id));if(!Number.isFinite(n)||n<=0){$('lineageStatus').textContent='正しい緑の個体番号を入力してください。';return}
@@ -339,6 +344,13 @@ $('videoRunCompare').onclick=async()=>{
 };
 
 $('lineageSearch').onclick=()=>chooseFamily($('lineageId').value);
+$('lineageGoParent').onclick=()=>{
+ const id=lab.lineageDetail(activeFamilyId)?.person?.parentId;
+ if(id)chooseFamily(id);
+};
+$('lineageChildren').onchange=()=>{
+ if($('lineageChildren').value)chooseFamily($('lineageChildren').value);
+};
 $('lineageFromSelection').onclick=()=>{
  const e=lab.entities.find(x=>x.id===focus&&x.alive&&x.type==='g');
  if(e)chooseFamily(e.id);
