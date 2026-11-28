@@ -1,0 +1,27 @@
+name: Family lineage and 100-seed studio regression
+on:
+  push:
+    branches:
+      - feature/lineage-and-multiseed-studio-20261128
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Original ecology and neuroevolution invariants
+        run: node tests/smoke.test.js
+      - name: Existing 16:9 video graph and herd signal invariants
+        run: node tests/video-analytics.test.js
+      - name: All family records and independent multi-seed numerical accuracy
+        run: node tests/lineage-batch.test.js
+      - name: Browser UI family selection and 10-seed run/abort/export
+        run: node tests/ui-smoke.js
+      - name: Existing AI2 heritable social behaviour
+        run: node tests/ai2-social.test.js
