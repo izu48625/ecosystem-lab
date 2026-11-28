@@ -15,7 +15,7 @@ const context2d=new Proxy({}, {get:(target,key)=>target[key]??noop,set:(target,k
 const values={seed:20261117,startg:100,startr:20,startb:0,variance:10,regrowth:100,videoGraphSelect:'population'};
 const elements=new Map();
 function element(id){
- if(!elements.has(id))elements.set(id,{id,value:values[id]??0,textContent:'',style:{},hidden:false,attributes:{},setAttribute(n,v){this.attributes[n]=v},disabled:false,onclick:null,oninput:null,addEventListener:noop,click:noop,getBoundingClientRect:()=>({left:0,top:0,width:960,height:600}),getContext:()=>context2d});
+ if(!elements.has(id))elements.set(id,{id,value:values[id]??0,textContent:'',style:{},hidden:false,attributes:{},setAttribute(n,v){this.attributes[n]=v},disabled:false,onclick:null,oninput:null,addEventListener:noop,click:noop,getBoundingClientRect:()=>({left:0,top:0,width:960,height:600}),getContext:()=>context2d,toBlob:cb=>cb({type:'image/png'})});
  return elements.get(id);
 }
 const speedButtons=[1,5,20].map(v=>({dataset:{s:String(v)},classList:{toggle:noop},onclick:null}));
