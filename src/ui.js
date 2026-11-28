@@ -4,6 +4,8 @@
 const $=id=>document.getElementById(id), {Lab,SPECIES,W,H,GRID_X,GRID_Y,CELL}=window.EcosystemCore;
 const cv=$('world'),c=cv.getContext('2d'),pop=$('chart'),popCtx=pop.getContext('2d'),pred=$('predChart'),predCtx=pred.getContext('2d');
 const CHECKPOINT_DAY=100;
+const video=window.EcosystemVideo;
+let videoComparison=null,videoCompareRunning=false,lastVideoLab=null,lastVideoLength=-1,lastVideoGraph='',lastVideoComparison=null;
 let lab,playing=true,ended=false,checkpointPassed=false,speed=5,focus=null,zoom=1,cam={x:W/2,y:H/2},time=0,accum=0,lastUI=0,chartAt=0,activeTab='normal';
 const worlds={normal:null,ai1:null,ai2:null};
 const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
@@ -68,7 +70,33 @@ function chartDraw(canvas,ctx,keys){
    visible.forEach((n,i)=>{if(!i)ctx.moveTo(px(n.day),py(n[k]));else ctx.lineTo(px(n.day),py(n[k]))});ctx.stroke()}
  ctx.strokeStyle='#d4efda88';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(px(lab.day),top);ctx.lineTo(px(lab.day),h-bottom);ctx.stroke();ctx.setLineDash([]);
 }
-function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r'])}
+function drawCharts(){chartDraw(pop,popCtx,['g','r']);chartDraw(pred,predCtx,['r']);drawVideo()}
+function videoSelection(){return $('videoGraphSelect').value||'population'}
+function validVideoComparison(){
+ return videoComparison&&videoComparison.signature===video.signature(options())?videoComparison:null;
+}
+function drawVideo(force=false){
+ if(!video)return;
+ const graph=videoSelection(),comp=validVideoComparison();
+ if(!force&&lastVideoLab===lab&&lastVideoLength===lab.history.length&&lastVideoGraph===graph&&lastVideoComparison===comp)return;
+ const result=video.paint($('videoCanvas'),{lab,graph,comparison:comp});
+ lastVideoLab=lab;lastVideoLength=lab.history.length;lastVideoGraph=graph;lastVideoComparison=comp;
+ const last=lab.history.at(-1),first=lab.history[0];
+ const stats=graph==='genes'&&lab.settings.mode==='social'?
+  '集合 '+(first.ai2GeneGather??'—')+' → '+(last.ai2GeneGather??'—')+
+  ' ／ 方向同調 '+(first.ai2GeneAlign??'—')+' → '+(last.ai2GeneAlign??'—')+
+  ' ／ 密集回避 '+(first.ai2GeneSeparate??'—')+' → '+(last.ai2GeneSeparate??'—'):
+  graph==='herd'&&lab.settings.mode==='social'?
+    '群れ参加 '+(last.ai2GroupedPct??'—')+'% ／ 最大連結群 '+(last.ai2LargestConnectedPct??'—')+'%':
+  graph==='compare'&&comp?
+    '同じシード '+comp.seed+' ｜ DAY100実測：ノーマル '+
+    comp.normal.history.at(-1).g+'匹 ／ AI① '+comp.ai1.history.at(-1).g+
+    '匹 ／ AI② '+comp.ai2.history.at(-1).g+'匹':
+   'DAY '+lab.day.toFixed(1)+'・生存 緑'+lab.counts().g+'匹／赤'+lab.counts().r+
+   '匹。日別の履歴を自動記録中。';
+ if(!videoCompareRunning)$('videoInfo').textContent=result.error||stats;
+}
+
 function show(){
  const n=lab.counts(),s=lab.stats;$('ng').textContent=n.g;$('nr').textContent=n.r;$('nb').textContent=n.b;$('day').textContent=`DAY ${lab.day.toFixed(1)} ｜ ${!playing&&checkpointPassed&&Math.abs(lab.day-CHECKPOINT_DAY)<1e-6?'100日地点で一時停止':'観察中'}`;
  const grass=(100*lab.grassTotal()).toFixed(0)+'%';$('grass').textContent=grass;$('grassbar').style.width=grass;
@@ -117,7 +145,10 @@ function exportCSV(){
   'aiChaseStarts','aiChaseEscaped','aiChaseCaught','aiChaseOther','aiChaseDistanceBreakPct',
   'aiEncounterStarts','aiEncounterSurvived','aiEncounterHit','aiEncounterDiedOther',
   'aiEncounterPending','aiAttackFree1dPct',
-  'ai2GroupedPct','ai2MeanNeighbors','ai2MaxLocalGroup','ai2MeanNearest'];
+  'ai2GroupedPct','ai2MeanNeighbors','ai2MaxLocalGroup','ai2MeanNearest',
+  'ai2LargestConnectedPct','ai2HeadingAlignment',
+  'ai2GeneGather','ai2GeneAlign','ai2GeneSeparate',
+  'huntg','ageg','redIndividualDays'];
  const rows=[keys.join(','),...lab.history.map(d=>keys.map(k=>d[k]??'').join(','))];
  const blob=new Blob(['\ufeff'+rows.join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ecosystem_${lab.settings.mode}_seed_${lab.settings.seed}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
 } 
@@ -186,6 +217,53 @@ $('single').onclick=()=>advanceTo(Math.floor(lab.day)+1);
 $('jump10').onclick=()=>advanceTo(lab.day+10);
 $('jump100').onclick=()=>advanceTo(lab.day+100);
 $('csv').onclick=exportCSV;
+$('videoGraphSelect').onchange=()=>drawVideo(true);
+$('videoSavePng').onclick=()=>{
+ drawVideo(true);
+ video.download($('videoCanvas'),'ecosystem_video_'+videoSelection()+
+  '_DAY'+Math.round(lab.day)+'_seed'+lab.settings.seed+'.png');
+};
+$('videoSaveCsv').onclick=()=>{
+ const graph=videoSelection(),cmp=validVideoComparison();
+ const query=video.seriesFor(lab,graph,cmp);
+ if(query.error){$('videoInfo').textContent=query.error;return}
+ const blob=new Blob([video.csv(lab,graph,cmp)],{type:'text/csv;charset=utf-8'});
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download='ecosystem_video_'+graph+'_DAY'+Math.round(lab.day)+'_seed'+lab.settings.seed+'.csv';
+ document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1500);
+};
+$('videoRunCompare').onclick=async()=>{
+ if(videoCompareRunning)return;
+ videoCompareRunning=true;
+ const btn=$('videoRunCompare'),originalPlaying=playing,pref=options();
+ const signature=video.signature(pref);
+ playing=false;btn.disabled=true;
+ const result={signature,seed:pref.seed};
+ try{
+  for(const [model,key] of [['normal','normal'],['escape','ai1'],['social','ai2']]){
+   const world=new Lab({...pref,mode:model,duration:100});
+   world.aiLog=function(){};
+   for(let target=5;target<=100;target+=5){
+     world.run(target,.08);
+     $('videoInfo').textContent='同条件3モード比較：'+video.modeLabel(model)+'　DAY'+target+'/100を計算中…';
+     await new Promise(resolve=>setTimeout(resolve,0));
+   }
+   result[key]={history:world.history,counts:world.counts()};
+  }
+  videoComparison=result;
+  $('videoGraphSelect').value='compare';
+  // If a setting was edited while computation ran, do not show mismatched curves.
+  drawVideo(true);
+ }catch(error){
+  $('videoInfo').textContent='比較データを作れませんでした。設定を確認してください。';
+  console.error('Video comparison failed',error);
+ }finally{
+  videoCompareRunning=false;btn.disabled=false;
+  playing=originalPlaying&&!ended;show();
+  if(videoComparison&&videoComparison.signature===video.signature(options()))drawVideo(true);
+ }
+};
 $('escapeCsv').onclick=exportEscapeCSV;
 $('openReport').onclick=()=>{
  playing=false;accum=0;show();
@@ -241,5 +319,5 @@ $('batch').onclick=async()=>{
   btn.disabled=false;playing=wasPlaying&&!ended;
  }
 };
-reset();requestAnimationFrame(frame);
+reset();drawVideo(true);requestAnimationFrame(frame);
 })();
