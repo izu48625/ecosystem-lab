@@ -1,0 +1,25 @@
+name: In-app video analytics and simulation regression
+on:
+  push:
+    branches:
+      - feature/video-analysis-dashboard-20261128
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Existing ecology and AI regression
+        run: node tests/smoke.test.js
+      - name: Verify video graph values, true herd connectivity and genetic trait probes
+        run: node tests/video-analytics.test.js
+      - name: Browser tab, screenshot and CSV UI smoke
+        run: node tests/ui-smoke.js
+      - name: Existing AI2 neural social heredity regression
+        run: node tests/ai2-social.test.js
