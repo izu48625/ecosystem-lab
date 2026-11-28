@@ -22,15 +22,15 @@ jobs:
           python-version: '3.11'
       - name: Install visual renderer
         run: |
-          python -m pip install pillow
-          command -v ffmpeg
+          python -m pip install pillow imageio-ffmpeg
+          python -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())'
       - name: Replay actual AI2 deterministic simulation
         run: node tools/record-ai2-preview.js
       - name: Render 24-second time-compressed HD video
         run: python tools/render-ai2-preview.py
       - name: Verify MP4 media and dimensions
         run: |
-          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,duration -of json video-previews/ai2_real_simulation_preview.mp4
+          python -c 'import imageio_ffmpeg,subprocess; subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(),"-hide_banner","-i","video-previews/ai2_real_simulation_preview.mp4"],check=False)'
           test -s video-previews/ai2_real_simulation_preview.mp4
       - name: Publish MP4 and run metadata as workflow artifact
         uses: actions/upload-artifact@v4
