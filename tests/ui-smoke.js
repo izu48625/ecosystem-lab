@@ -12,7 +12,7 @@ for(const file of ['../src/ui.js','../src/report.js']){
 
 const noop=()=>{};
 const context2d=new Proxy({}, {get:(target,key)=>target[key]??noop,set:(target,key,val)=>(target[key]=val,true)});
-const values={seed:20261117,startg:100,startr:20,startb:0,variance:10,regrowth:100,videoGraphSelect:'population'};
+const values={seed:20261117,startg:100,startr:20,startb:0,variance:10,regrowth:100,videoGraphSelect:'population',batchCount:'10',batchScope:'social',batchGraph:'green',lineageId:1,lineageSuggested:''};
 const elements=new Map();
 function element(id){
  if(!elements.has(id))elements.set(id,{id,value:values[id]??0,textContent:'',style:{},hidden:false,attributes:{},setAttribute(n,v){this.attributes[n]=v},disabled:false,onclick:null,oninput:null,addEventListener:noop,click:noop,getBoundingClientRect:()=>({left:0,top:0,width:960,height:600}),getContext:()=>context2d,toBlob:cb=>cb({type:'image/png'})});
@@ -28,10 +28,12 @@ const dom={
    {click:()=>{pngDownloads++},remove:noop}
 };
 let requested=0,nextFrame=null;
-const appContext={document:dom,window:{EcosystemCore},requestAnimationFrame:fn=>{requested++;nextFrame=fn},setTimeout:noop,URL:{createObjectURL:()=>'',revokeObjectURL:noop},Blob:class{},console,Math,Number};
+const appContext={document:dom,window:{EcosystemCore},requestAnimationFrame:fn=>{requested++;nextFrame=fn},setTimeout:fn=>fn(),URL:{createObjectURL:()=>'',revokeObjectURL:noop},Blob:class{},console,Math,Number};
 vm.createContext(appContext);
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/report.js'),'utf8'),appContext);
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/video-lab.js'),'utf8'),appContext);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/lineage-view.js'),'utf8'),appContext);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/batch-studio.js'),'utf8'),appContext);
 vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../src/ui.js'),'utf8'),appContext);
 assert.equal(element('ng').textContent,100);assert.equal(element('nr').textContent,20);assert.equal(element('nb').textContent,0);assert.ok(requested>0);
 assert.ok(element('videoInfo').textContent.includes('DAY 0.0'),'Video chart starts at live seed DAY0');
@@ -181,3 +183,32 @@ assert.ok(Number(element('day').textContent.match(/DAY ([0-9.]+)/)[1])>200,'play
 assert.ok(element('toggle').textContent.includes('⏸'),'there must be no later automatic stop');
 console.log('✓ DAY100で1回だけ自動停止し、▶の後はDAY200以降も連続再生する');
 console.log('✓ UI操作の基本テストに成功');
+
+
+// Video-ready genealogy and in-app replicated ecological statistics.
+(async()=>{
+ const before=pngDownloads;
+ element('lineageId').value='1';element('lineageSearch').onclick();
+ assert.ok(element('lineageStatus').textContent.includes('緑 #1'),'Founder family search works');
+ assert.ok(element('lineageDetails').innerHTML.includes('採食と寿命'));
+ element('lineageSavePng').onclick();element('lineageSaveCsv').onclick();
+ assert.equal(pngDownloads,before+2,'Selected lineage exports both 16:9 PNG and CSV');
+ const previousDay=element('day').textContent;
+ element('batchScope').value='social';element('batchCount').value='10';
+ const completed=element('batchRun').onclick();
+ assert.equal(element('batchRun').disabled,true,'Batch button locked during study');
+ await completed;
+ assert.equal(element('batchRun').disabled,false);
+ assert.ok(element('batchStatus').textContent.includes('完了：10組'),'In-app ten-seed independent ecology study completes');
+ assert.ok(element('batchSummary').innerHTML.includes('AI② 群れ'),'Seed study renders numerical summary cards');
+ element('batchGraph').value='separate';element('batchGraph').onchange();
+ const prior=pngDownloads;
+ element('batchSavePng').onclick();element('batchSaveCsv').onclick();element('batchSaveSeedCsv').onclick();
+ assert.equal(pngDownloads,prior+3,'Seed mean, bands and individual seed data export');
+ assert.equal(element('day').textContent,previousDay,'Batch did not mutate current live world');
+ const runAgain=element('batchRun').onclick();
+ element('batchCancel').onclick();
+ await runAgain;
+ assert.ok(element('batchStatus').textContent.includes('中止'),'User can abort a larger study without publishing incomplete results');
+ console.log('✓ Live genealogy select, export, 10-seed study, charts, exports, cancellation and preserved world');
+})().catch(error=>{console.error(error);process.exitCode=1});
