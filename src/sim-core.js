@@ -53,6 +53,8 @@
         mode:settings.mode==='social'?'social':settings.mode==='escape'?'escape':'normal',
         // Social ablation: identical AI2 predator avoidance without neighbour steering.
         socialEnabled:settings.socialEnabled!==false,
+        // Observation-only family archive for the interactive live world.
+        trackLineages:settings.trackLineages===true,
         // Green-only strategies. 'baseline' preserves the old AI1 for reproducible historical comparison.
         escapePolicy:['baseline','early','guard','wide'].includes(settings.escapePolicy)?
           settings.escapePolicy:'wide',
@@ -62,6 +64,7 @@
       this.seed=this.settings.seed||1;this.day=0;this.nextId=0;this.entities=[];
       this.grass=Array.from({length:GRID_X*GRID_Y},()=>this.rand(.5,1));
       this.history=[];this.events=[];this.effects=[];
+      this.lineageRecords=new Map();this.lineageIds=[];
       this.stats={births:{g:0,r:0,b:0},deaths:{g:{hunt:0,starve:0,age:0,defense:0},r:{hunt:0,starve:0,age:0,defense:0},b:{hunt:0,starve:0,age:0,defense:0}},kills:{r:0,b:0},hunts:{r:0,b:0},strikes:{r:0,b:0},counters:0,
         // Exposure is the total time spent alive by all members of each species.
         individualDays:{g:0,r:0,b:0},edgeDays:{g:0,r:0,b:0},starveWithGlobalGrass:{g:0,r:0,b:0},starveWithLocalGrass:{g:0,r:0,b:0},ai:{founders:0,offspring:0,mutatedOffspring:0,mutatedGenes:0,highestGeneration:0,threatDays:0,fleeDays:0,riskDays:0,
@@ -205,6 +208,72 @@
       }
       if(green.aiEncounter)this.aiEncounterFinish(green,'hit');
     }
+    // A fixed neural probe at birth lets offspring and parents be compared
+    // under identical stimuli; genetic tendency, not proven fitness.
+    lineageNeuralTraits(e){
+      if(!e.genome||this.settings.mode!=='social')return null;
+      return this.socialGeneSnapshot([e]);
+    }
+    lineageCreate(e,parent){
+      if(!this.settings.trackLineages||e.type!=='g')return;
+      const inherited=this.lineageNeuralTraits(e),parentRec=parent?.lineage||null;
+      const rec={
+        id:e.id,parentId:parentRec?.id??null,
+        rootId:parentRec?.rootId??e.id,
+        generation:e.generation??0,bornDay:Number(this.day.toFixed(2)),
+        bornAge:e.age,initialEnergy:e.energy,lifeLimit:e.life,
+        traits:inherited,geneticDelta:inherited&&parentRec?.traits?{
+          gather:Number((inherited.gather-parentRec.traits.gather).toFixed(4)),
+          align:Number((inherited.align-parentRec.traits.align).toFixed(4)),
+          separate:Number((inherited.separate-parentRec.traits.separate).toFixed(4))
+        }:null,
+        children:[],alive:true,death:null,deathDay:null,
+        lastEnergy:e.energy,lastAge:e.age,lastX:e.x,lastY:e.y,
+        lifeDays:0,foodEnergy:0,groupDays:0,crowdDays:0,headingSum:0,headingDays:0,
+        redContactDays:0,hitCount:0,lowEnergyDays:0,
+        checkpoints:[{day:Number(this.day.toFixed(2)),energy:Number(e.energy.toFixed(1)),food:0,children:0}]
+      };
+      e.lineage=rec;this.lineageRecords.set(e.id,rec);this.lineageIds.push(e.id);
+      if(parentRec)parentRec.children.push(e.id);
+    }
+    lineageDetail(id){
+      const person=this.lineageRecords?.get(Number(id));
+      if(!person)return null;
+      const family=[];
+      for(const entry of this.lineageRecords.values())if(entry.rootId===person.rootId)family.push(entry);
+      const ancestors=[];let p=person,guard=0;
+      while(p&&guard++<20){ancestors.push(p);p=p.parentId?this.lineageRecords.get(p.parentId):null}
+      const descendants=family.filter(e=>e.id!==person.id&&(function descend(x){
+        let depth=0;while(x?.parentId&&depth++<60){
+          if(x.parentId===person.id)return true;
+          x=this.lineageRecords.get(x.parentId);
+        }return false;
+      }).call(this,e));
+      return {person,ancestors:ancestors.reverse(),directChildren:person.children.map(x=>this.lineageRecords.get(x)).filter(Boolean),
+        familyTotal:family.length,familyAlive:family.filter(e=>e.alive).length,
+        descendantsTotal:descendants.length,descendantsAlive:descendants.filter(e=>e.alive).length,
+        familyRootsAlive:this.lineageLeaders(1000).length};
+    }
+    lineageLeaders(limit=12){
+      const map=new Map();
+      for(const r of this.lineageRecords.values()){
+        let f=map.get(r.rootId);
+        if(!f){f={rootId:r.rootId,total:0,alive:0,maxGeneration:0,founder:null};map.set(r.rootId,f)}
+        f.total++;if(r.alive)f.alive++;
+        f.maxGeneration=Math.max(f.maxGeneration,r.generation);
+        if(r.id===r.rootId)f.founder=r;
+      }
+      return [...map.values()].filter(f=>f.alive).sort((a,b)=>b.alive-a.alive||b.total-a.total||a.rootId-b.rootId).slice(0,limit);
+    }
+    lineageCheckpoint(day){
+      if(!this.settings.trackLineages||day%10!==0)return;
+      for(const e of this.entities){
+        if(!e.alive||!e.lineage)continue;
+        const r=e.lineage;
+        r.checkpoints.push({day,energy:Number(e.energy.toFixed(1)),
+          food:Number(r.foodEnergy.toFixed(1)),children:r.children.length});
+      }
+    }
     spawn(type,x,y,initial=false,parent=null){
       const t=SPECIES[type], variation=()=>1+this.rand(-this.settings.variance,this.settings.variance);
       const temperament= type==='g'?(this.rnd()<.25?'timid':this.rnd()<.333?'brave':'normal'):(this.rnd()<.5?'bold':'careful');
@@ -219,6 +288,7 @@
         this.stats.ai.highestGeneration=Math.max(this.stats.ai.highestGeneration,e.generation);
         this.aiGeneration(e.generation).born++;
       }
+      this.lineageCreate(e,parent);
       this.entities.push(e);return e;
     }
     counts(){const out={g:0,r:0,b:0};for(const a of this.entities)if(a.alive)out[a.type]++;return out}
@@ -274,6 +344,7 @@
       if(this.settings.mode!=='normal'&&a.type==='g'&&a.aiEncounter)
         this.aiEncounterFinish(a,'diedOther');
       a.alive=false;this.stats.deaths[a.type][reason]++;
+      if(a.lineage){a.lineage.alive=false;a.lineage.death=reason;a.lineage.deathDay=Number(this.day.toFixed(2));}
       if(this.settings.mode!=='normal'&&a.type==='r')this.aiChaseFinish(a,'other','red_died');
       if(reason==='starve'){
         // Global grass alone cannot indicate whether an individual could reach food.
@@ -424,6 +495,7 @@
         if(!e.alive)continue;
         const t=SPECIES[e.type];
         this.stats.individualDays[e.type]+=dt;
+        if(e.lineage){e.lineage.lifeDays+=dt;if(e.energy<35)e.lineage.lowEnergyDays+=dt;}
         e.age+=dt;e.energy-=dt*t.drain*(e.age<t.mature?.46:1);
         if(e.age>=e.life){this.die(e,'age');continue}
         // Hunger is checked *after* a foraging/hunting opportunity this tick.
@@ -435,6 +507,14 @@
           const escapeAI=this.settings.mode!=='normal',socialAI=this.settings.mode==='social';
           const social=socialAI&&this.settings.socialEnabled?this.socialContext(e,index):null;
           if(socialAI)e.socialNeighbors=social?.nearCount||0;
+          if(e.lineage&&social){
+            if(social.nearCount>=2)e.lineage.groupDays+=dt;
+            if(social.nearest<30)e.lineage.crowdDays+=dt;
+            if(social.count>0){
+              e.lineage.headingSum+=dt*(Math.cos(e.angle)*social.ax+Math.sin(e.angle)*social.ay);
+              e.lineage.headingDays+=dt;
+            }
+          }
           const socialGenes=social?neuralForward(e.genome,[
             clamp((social.cx-e.x)/115,-1,1),clamp((social.cy-e.y)/115,-1,1),
             social.ax,social.ay,clamp(social.count/12,0,1),
@@ -444,6 +524,7 @@
           ]):null;
           const dangerRange=(escapeAI?180:(e.energy<28?48:85))*e.view;
           const danger=this.nearest(e,index,dangerRange,'r');
+          if(e.lineage&&danger)e.lineage.redContactDays+=dt;
           if(escapeAI)this.aiEncounterObserve(e,danger);
           const dangerB=this.nearest(e,index,dangerRange,'b');
           const threat=!danger?dangerB:!dangerB?danger:Math.hypot(e.x-danger.x,e.y-danger.y)<Math.hypot(e.x-dangerB.x,e.y-dangerB.y)?danger:dangerB;
@@ -516,7 +597,10 @@
             this.move(e,dx,dy,dt,55*e.speed,0,'wander');
           }
           const gidx=this.gridIndex(e.x,e.y),amount=Math.min(this.grass[gidx],dt*.48);
-          if(amount>0){this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92)}
+          if(amount>0){
+            if(e.lineage)e.lineage.foodEnergy+=Math.max(0,Math.min(100-e.energy,amount*92));
+            this.grass[gidx]-=amount;e.energy=Math.min(100,e.energy+amount*92);
+          }
         }else{
           const needsFood=e.energy<(e.type==='r'?55:64);
           let target=null;
@@ -534,6 +618,7 @@
             const dist=Math.hypot(target.x-e.x,target.y-e.y);
             if(dist<20 && this.day-e.lastAttack>=t.attackCooldown){
               if(e.type==='r')this.aiEncounterHit(target,e);
+              if(target.lineage&&e.type==='r')target.lineage.hitCount++;
               e.lastAttack=this.day;target.hp-=e.attack;target.flash=.28;this.stats.strikes[e.type]++;this.particle(target.x,target.y,e.type==='r'?'#ffc38c':'#b1d7ff',3);
               if(target.alive && target.hp>0 && this.day-target.lastCounter>.42){
                 const counterChance=target.temperament==='brave'?.3:target.temperament==='timid'?.15:.2;
@@ -560,9 +645,10 @@
         const fertility=e.type==='g'?clamp((foodAvailability-.05)/.38,.05,1):1;
         if(canBirth && this.rnd()<dt*t.birthRate*fertility && this.entities.length+newborn.length<MAX_POP){
           e.energy-=t.birthCost;e.lastBirth=this.day;e.children++;
-          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),parent:this.settings.mode!=='normal'&&e.type==='g'?e:null});this.stats.births[e.type]++;
+          newborn.push({type:e.type,x:e.x+this.rand(-10,10),y:e.y+this.rand(-10,10),parent:e.type==='g'?e:null});this.stats.births[e.type]++;
           if(e.type!=='g'&&this.stats.births[e.type]===1)this.record('birth', (e.type==='r'?'赤':'青')+'の捕食者が初めて繁殖');
         }
+        if(e.lineage){e.lineage.lastAge=e.age;e.lineage.lastEnergy=e.energy;e.lineage.lastX=e.x;e.lineage.lastY=e.y;}
         e.phase+=dt*10;e.flash=Math.max(0,e.flash-dt);
       }
       for(const item of newborn)this.spawn(item.type,item.x,item.y,false,item.parent);
@@ -570,7 +656,7 @@
       for(const p of this.effects){p.x+=p.vx*dt;p.y+=p.vy*dt;p.life-=dt}
       this.effects=this.effects.filter(p=>p.life>0);
       const today=Math.floor(this.day);
-      if(today>oldDay){for(let d=oldDay+1;d<=today;d++){this.snapshot(d);if(d%20===0){const n=this.counts();this.record('milestone',`緑${n.g}匹、赤${n.r}匹、青${n.b}匹が生存`)}}}
+      if(today>oldDay){for(let d=oldDay+1;d<=today;d++){this.snapshot(d);this.lineageCheckpoint(d);if(d%20===0){const n=this.counts();this.record('milestone',`緑${n.g}匹、赤${n.r}匹、青${n.b}匹が生存`)}}}
       if(Number.isFinite(this.settings.duration)&&this.day>=this.settings.duration)this.record('end',`${this.settings.duration}日間の実験終了`);
     }
     run(days=Number.isFinite(this.settings.duration)?this.settings.duration:this.day+100,step=.08){if(!Number.isFinite(days))throw new RangeError('Run target day must be finite');let loops=0;const to=clamp(days,0,this.settings.duration);while(this.day<to){this.update(Math.min(step,to-this.day));if(++loops>100000)throw new Error('Unexpected simulation loop')}return this}
