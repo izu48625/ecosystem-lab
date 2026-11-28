@@ -47,18 +47,25 @@ function paint(canvas,detail,lab){
   ctx.fillStyle=color;ctx.font='bold 28px system-ui';
   ctx.fillText(fmt(val,3)+(r.geneticDelta?'  (親との差 '+(r.geneticDelta[key]>=0?'+':'')+fmt(r.geneticDelta[key],3)+')':''),x,y+85);
  });
- ctx.fillStyle='#e8fff3';ctx.font='bold 30px system-ui';ctx.fillText('親子の系統',68,739);
- const a=detail.ancestors.slice(-6);
- const gap=Math.min(260,1460/Math.max(1,a.length));let x=70;
+ ctx.fillStyle='#e8fff3';ctx.font='bold 27px system-ui';ctx.fillText('親から本人まで',68,706);
+ const a=detail.ancestors.slice(-6),gap=Math.min(250,1460/Math.max(1,a.length));let x=69;
  a.forEach((p,i)=>{
   const last=i===a.length-1;
-  ctx.fillStyle=last?'#285b49':'#173b34';ctx.fillRect(x,763,gap-14,76);
-  ctx.fillStyle=last?'#a7ffcd':'#d2e7db';ctx.font='bold 24px system-ui';ctx.fillText('#'+p.id,x+11,790);
-  ctx.font='17px system-ui';ctx.fillText('第'+p.generation+'世代',x+11,819);
-  x+=gap;
+  ctx.fillStyle=last?'#285b49':'#173b34';ctx.fillRect(x,715,gap-14,55);
+  ctx.fillStyle=last?'#a7ffcd':'#d2e7db';ctx.font='bold 21px system-ui';ctx.fillText('#'+p.id,x+11,738);
+  ctx.font='16px system-ui';ctx.fillText('第'+p.generation+'世代',x+11,760);x+=gap;
  });
- ctx.font='18px system-ui';ctx.fillStyle='#8eb8a7';
- ctx.fillText('親子のつながりは母系の継承経路。生存・採食量・群れ参加は観測値で、進化の因果効果を証明するものではありません。',65,876);
+ ctx.fillStyle='#b8dbcb';ctx.font='21px system-ui';
+ ctx.fillText('直接の子：'+detail.directChildren.length+'匹　｜　直系の生存子孫：'+detail.descendantsAlive+'匹',69,804);
+ const children=detail.directChildren.slice(0,9),childGap=Math.min(160,1460/Math.max(1,children.length));
+ let cx=69;
+ children.forEach(child=>{
+  ctx.fillStyle=child.alive?'#265846':'#24393b';ctx.fillRect(cx,815,childGap-9,43);
+  ctx.fillStyle=child.alive?'#a3f6c4':'#a2b4ae';ctx.font='bold 17px system-ui';
+  ctx.fillText('#'+child.id,cx+7,844);cx+=childGap;
+ });
+ ctx.font='17px system-ui';ctx.fillStyle='#8eb8a7';
+ ctx.fillText('母系の親子関係を実測記録。生存・採食量・群れ参加と遺伝子の関連は、因果効果の証明とは異なります。',65,886);
  return {person:r,detail};
 }
 function csv(detail){
@@ -75,7 +82,9 @@ function csv(detail){
  const lines=[head.join(','),row.join(','),'','day,energy,food,children',
   ...r.checkpoints.map(p=>[p.day,p.energy,p.food,p.children].join(',')),
   '','ancestorId,generation,bornDay,deathDay',
-  ...detail.ancestors.map(p=>[p.id,p.generation,p.bornDay,p.deathDay??''].join(','))];
+  ...detail.ancestors.map(p=>[p.id,p.generation,p.bornDay,p.deathDay??''].join(',')),
+  '','childId,generation,bornDay,alive,deathDay',
+  ...detail.directChildren.map(p=>[p.id,p.generation,p.bornDay,Number(p.alive),p.deathDay??''].join(','))];
  return '\ufeff'+lines.join('\r\n');
 }
 root.EcosystemLineage={paint,csv};
